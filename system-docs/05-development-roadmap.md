@@ -162,28 +162,28 @@ This document maintains the step-by-step roadmap for implementing the Local-Firs
 
 ### Task 5.1: Vector Similarity Query Function
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Write standard SQL query using pgvector's operators (e.g. `<->` Euclidean distance or `<~>` cosine distance).
   - Retrieve the top `k` chunks matching target query keywords or tags, filtered strictly by `user_id` and `topic_id`.
-- [ ] **Target Goal:** Return semantic context blocks associated with chosen terms.
-- [ ] **Dependencies:** [Task 4.3](#task-43-implement-parser--embedder-pipeline-gemini-integration).
+- [x] **Target Goal:** Return semantic context blocks associated with chosen terms.
+- [x] **Dependencies:** [Task 4.3](#task-43-implement-parser--embedder-pipeline-gemini-integration).
 
 ### Task 5.2: Structured MCQ Generation Service (Gemini API)
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Formulate structured prompt targeting Gemini API.
   - Use Gemini's structured JSON output configuration (`response_mime_type="application/json"`) to return:
     - `question_text`, `options` (array of text and correctness boolean), `explanation` (why it's correct), and `tags` (suggested tags).
   - Save the questions, options, and tags inside a database transaction.
-- [ ] **Target Goal:** Successfully save high-quality MCQs mapped to parsed tags.
-- [ ] **Dependencies:** [Task 5.1](#task-51-vector-similarity-query-function).
+- [x] **Target Goal:** Successfully save high-quality MCQs mapped to parsed tags.
+- [x] **Dependencies:** [Task 5.1](#task-51-vector-similarity-query-function).
 
 ### Task 5.3: Exam Generator Config UI
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Design the `ExamConfigPanel` React UI mapping: question counts, tags selection, difficulty toggles.
-- [ ] **Target Goal:** Configuration is successfully packed into a payload and sent to backend generator APIs.
-- [ ] **Dependencies:** [Task 5.2](#task-52-structured-mcq-generation-service-gemini-api).
+- [x] **Target Goal:** Configuration is successfully packed into a payload and sent to backend generator APIs.
+- [x] **Dependencies:** [Task 5.2](#task-52-structured-mcq-generation-service-gemini-api).
 
 ---
 

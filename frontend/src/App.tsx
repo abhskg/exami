@@ -13,7 +13,13 @@ import {
   LogOut,
   Plus,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  BookOpen,
+  Tag,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
 
@@ -34,6 +40,22 @@ interface Document {
   original_filename: string;
   status: string;
   ingested_at: string;
+}
+
+interface QuestionOption {
+  id: string;
+  option_text: string;
+  is_correct: boolean;
+  option_order: number;
+}
+
+interface GeneratedQuestion {
+  id: string;
+  question_text: string;
+  explanation: string | null;
+  difficulty: string;
+  options: QuestionOption[];
+  tags: string[];
 }
 
 function App() {
@@ -66,7 +88,17 @@ function App() {
   
   // Toast Alert state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  
+
+  // ---- Exam Config Panel state ----
+  const [examCount, setExamCount] = useState<number>(5);
+  const [examDifficulty, setExamDifficulty] = useState<string>('medium');
+  const [examTagInput, setExamTagInput] = useState<string>('');
+  const [examTagFilters, setExamTagFilters] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
+  const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<any>(null);
   
@@ -339,14 +371,80 @@ function App() {
     };
   }, [token]);
 
-  // Refetch docs when selected topic changes
+  // Refetch docs + tags when selected topic changes
   useEffect(() => {
     if (selectedTopic) {
       fetchDocuments(selectedTopic.id);
+      fetchTags(selectedTopic.id);
     } else {
       setDocuments([]);
+      setAvailableTags([]);
     }
   }, [selectedTopic]);
+
+  // ---- Fetch tags for selected topic ----
+  const fetchTags = async (topicId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/questions/tags?topic_id=${topicId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableTags(data.map((t: { name: string }) => t.name));
+      }
+    } catch (err) {
+      console.error('Error fetching tags:', err);
+    }
+  };
+
+  // ---- Exam tag chip handlers ----
+  const addTagFilter = (tag: string) => {
+    const t = tag.trim().toLowerCase();
+    if (t && !examTagFilters.includes(t)) {
+      setExamTagFilters(prev => [...prev, t]);
+    }
+    setExamTagInput('');
+  };
+
+  const removeTagFilter = (tag: string) => {
+    setExamTagFilters(prev => prev.filter(t => t !== tag));
+  };
+
+  // ---- Generate Questions ----
+  const handleGenerateQuestions = async () => {
+    if (!selectedTopic || !token) return;
+    setIsGenerating(true);
+    setGeneratedQuestions([]);
+    try {
+      const res = await fetch(`${apiUrl}/api/questions/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic_id: selectedTopic.id,
+          count: examCount,
+          difficulty: examDifficulty,
+          tag_filters: examTagFilters
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedQuestions(data.questions || []);
+        await fetchTags(selectedTopic.id);
+        showToast(`Generated ${data.generated} question(s) successfully!`, 'success');
+      } else {
+        showToast(data.detail || 'Generation failed.', 'error');
+      }
+    } catch (err) {
+      console.error('Error generating questions:', err);
+      showToast('Network error during question generation.', 'error');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleAuthSuccess = (newToken: string, newUser: any) => {
     setToken(newToken);
@@ -361,6 +459,7 @@ function App() {
     setTopics([]);
     setSelectedTopic(null);
     setDocuments([]);
+    setGeneratedQuestions([]);
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
   };
 
@@ -998,17 +1097,289 @@ function App() {
           </div>
         )}
 
-        {/* Mock Exam simulator screen */}
+        {/* Exam Config Panel — Task 5.3 */}
         {activeTab === 'exam' && (
-          <div className="fade-in glass-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
-            <Clock size={48} color="var(--accent-primary)" style={{ marginBottom: '16px' }} />
-            <h2 style={{ marginBottom: '12px' }}>Exam Simulator ready</h2>
-            <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 24px' }}>
-              Once you run document ingestion and compile questions, you will be able to launch timed exam sets or customized practice sessions directly from this screen.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-              <button onClick={() => setActiveTab('setup')} className="btn btn-primary">Go to Document Ingestion</button>
+          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+            {/* Config Card */}
+            <div className="glass-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                <Sparkles size={22} color="var(--accent-primary)" />
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>Question Bank Generator</h2>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+
+                {/* Left — Config Inputs */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                  {/* Topic */}
+                  <div className="form-group">
+                    <label>Topic Domain</label>
+                    <select
+                      value={selectedTopic?.id || ''}
+                      onChange={(e) => {
+                        const topic = topics.find(t => t.id === e.target.value);
+                        if (topic) setSelectedTopic(topic);
+                      }}
+                      style={{ width: '100%' }}
+                      disabled={isGenerating}
+                    >
+                      {topics.length === 0 && <option value="">No topics — create one first</option>}
+                      {topics.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Question Count */}
+                  <div className="form-group">
+                    <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Number of Questions</span>
+                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{examCount}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={1} max={50} step={1}
+                      value={examCount}
+                      onChange={(e) => setExamCount(Number(e.target.value))}
+                      disabled={isGenerating}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <span>1</span><span>25</span><span>50</span>
+                    </div>
+                  </div>
+
+                  {/* Difficulty */}
+                  <div className="form-group">
+                    <label>Difficulty</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginTop: '4px' }}>
+                      {(['easy','medium','hard','mixed'] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setExamDifficulty(d)}
+                          disabled={isGenerating}
+                          style={{
+                            padding: '8px 4px',
+                            borderRadius: '8px',
+                            border: examDifficulty === d ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                            background: examDifficulty === d ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                            color: examDifficulty === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            fontWeight: examDifficulty === d ? 700 : 400,
+                            cursor: isGenerating ? 'not-allowed' : 'pointer',
+                            fontSize: '0.8rem',
+                            textTransform: 'capitalize',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >{d}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tag Filters */}
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Tag size={14} /> Concept Tags (optional)
+                    </label>
+
+                    {/* Available tags from DB */}
+                    {availableTags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', marginTop: '4px' }}>
+                        {availableTags.map(t => (
+                          <button
+                            key={t}
+                            onClick={() => addTagFilter(t)}
+                            disabled={isGenerating || examTagFilters.includes(t)}
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: '20px',
+                              border: '1px solid var(--border-color)',
+                              background: examTagFilters.includes(t) ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                              color: examTagFilters.includes(t) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                              fontSize: '0.75rem',
+                              cursor: examTagFilters.includes(t) || isGenerating ? 'default' : 'pointer',
+                              transition: 'all 0.15s'
+                            }}
+                          >{t}</button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Free-text tag entry */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="Type a tag and press Enter..."
+                        value={examTagInput}
+                        onChange={(e) => setExamTagInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTagFilter(examTagInput); } }}
+                        disabled={isGenerating}
+                        style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                      />
+                      <button
+                        onClick={() => addTagFilter(examTagInput)}
+                        disabled={!examTagInput.trim() || isGenerating}
+                        className="btn btn-secondary"
+                        style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '0.82rem' }}
+                      ><Plus size={14} /></button>
+                    </div>
+
+                    {/* Active filter chips */}
+                    {examTagFilters.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                        {examTagFilters.map(t => (
+                          <span key={t} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '4px',
+                            padding: '3px 10px', borderRadius: '20px',
+                            background: 'rgba(99,102,241,0.15)',
+                            border: '1px solid rgba(99,102,241,0.3)',
+                            color: 'var(--accent-primary)', fontSize: '0.75rem'
+                          }}>
+                            {t}
+                            <button onClick={() => removeTagFilter(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', padding: 0 }}><X size={12} /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Generate Button */}
+                  <button
+                    id="btn-generate-questions"
+                    onClick={handleGenerateQuestions}
+                    disabled={isGenerating || !selectedTopic || topics.length === 0}
+                    className="btn btn-primary"
+                    style={{ width: '100%', gap: '8px' }}
+                  >
+                    {isGenerating ? (
+                      <><Loader2 size={16} className="animate-spin" /><span>Generating via Gemini...</span></>
+                    ) : (
+                      <><Sparkles size={16} /><span>Generate {examCount} MCQ{examCount !== 1 ? 's' : ''}</span></>
+                    )}
+                  </button>
+                </div>
+
+                {/* Right — Summary / Hints */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '20px', background: 'rgba(99,102,241,0.05)', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.15)' }}>
+                    <h4 style={{ margin: '0 0 12px', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}><BookOpen size={16} /> How it works</h4>
+                    <ol style={{ paddingLeft: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.8, margin: 0 }}>
+                      <li>Relevant chunks are retrieved from your ingested documents using <strong>pgvector cosine similarity</strong>.</li>
+                      <li>Context blocks are assembled and sent to <strong>Gemini</strong> with a structured JSON output prompt.</li>
+                      <li>Generated MCQs are saved to the question bank with options, explanations, and concept tags.</li>
+                    </ol>
+                  </div>
+
+                  <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                      <strong style={{ color: 'var(--text-secondary)' }}>Topic:</strong> {selectedTopic?.name || '—'}<br />
+                      <strong style={{ color: 'var(--text-secondary)' }}>Documents ingested:</strong> {documents.filter(d => d.status === 'parsed').length} / {documents.length}<br />
+                      <strong style={{ color: 'var(--text-secondary)' }}>Available tags:</strong> {availableTags.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Generated Questions Preview */}
+            {generatedQuestions.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={20} color="var(--accent-teal)" />
+                    {generatedQuestions.length} Question{generatedQuestions.length !== 1 ? 's' : ''} Generated
+                  </h3>
+                  <button
+                    onClick={() => setGeneratedQuestions([])}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}
+                  ><X size={14} /> Clear</button>
+                </div>
+
+                {generatedQuestions.map((q, qi) => (
+                  <div key={q.id} className="glass-card" style={{ padding: '20px' }}>
+                    {/* Question header */}
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer', gap: '16px' }}
+                      onClick={() => setExpandedQuestion(expandedQuestion === q.id ? null : q.id)}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Q{qi + 1}</span>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.5 }}>{q.question_text}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600,
+                          background: q.difficulty === 'easy' ? 'rgba(20,184,166,0.12)' : q.difficulty === 'hard' ? 'rgba(239,68,68,0.12)' : 'rgba(168,85,247,0.12)',
+                          color: q.difficulty === 'easy' ? 'var(--accent-teal)' : q.difficulty === 'hard' ? '#ef4444' : 'var(--accent-secondary)',
+                          textTransform: 'capitalize'
+                        }}>{q.difficulty}</span>
+                        {expandedQuestion === q.id ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                      </div>
+                    </div>
+
+                    {/* Expanded: options + explanation */}
+                    {expandedQuestion === q.id && (
+                      <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                        {/* Options */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                          {q.options.sort((a, b) => a.option_order - b.option_order).map((opt) => (
+                            <div key={opt.id} style={{
+                              display: 'flex', alignItems: 'flex-start', gap: '10px',
+                              padding: '10px 14px', borderRadius: '8px',
+                              background: opt.is_correct ? 'rgba(20,184,166,0.08)' : 'rgba(255,255,255,0.02)',
+                              border: opt.is_correct ? '1px solid rgba(20,184,166,0.3)' : '1px solid var(--border-color)'
+                            }}>
+                              <span style={{
+                                width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.7rem', fontWeight: 700,
+                                background: opt.is_correct ? 'rgba(20,184,166,0.2)' : 'rgba(255,255,255,0.05)',
+                                color: opt.is_correct ? 'var(--accent-teal)' : 'var(--text-muted)'
+                              }}>
+                                {String.fromCharCode(65 + opt.option_order)}
+                              </span>
+                              <span style={{ fontSize: '0.88rem', color: opt.is_correct ? 'var(--accent-teal)' : 'var(--text-secondary)', lineHeight: 1.5, fontWeight: opt.is_correct ? 600 : 400 }}>
+                                {opt.option_text}
+                              </span>
+                              {opt.is_correct && (
+                                <CheckCircle2 size={15} color="var(--accent-teal)" style={{ marginLeft: 'auto', flexShrink: 0, marginTop: '2px' }} />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Explanation */}
+                        {q.explanation && (
+                          <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', marginBottom: '12px' }}>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                              <strong style={{ color: 'var(--accent-primary)' }}>Explanation: </strong>{q.explanation}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {q.tags.length > 0 && (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {q.tags.map(t => (
+                              <span key={t} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', background: 'rgba(168,85,247,0.1)', color: 'var(--accent-secondary)', border: '1px solid rgba(168,85,247,0.2)' }}>{t}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* No questions yet placeholder */}
+            {generatedQuestions.length === 0 && !isGenerating && (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '48px 40px', opacity: 0.7 }}>
+                <Sparkles size={40} color="var(--accent-primary)" style={{ marginBottom: '16px', opacity: 0.5 }} />
+                <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Configure your options above and click <strong>Generate MCQs</strong> to create your question bank.</p>
+              </div>
+            )}
           </div>
         )}
 
