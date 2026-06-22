@@ -193,26 +193,26 @@ This document maintains the step-by-step roadmap for implementing the Local-Firs
 
 ### Task 6.1: Exam Session Initializer API
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Create endpoint `/api/exams/sessions` parameterizing mode (timed vs practice), tags, count, and difficulty.
   - Create `exam_sessions` record and fetch matching questions.
-- [ ] **Target Goal:** Create exam workspace state returned in a clean API payload.
-- [ ] **Dependencies:** [Task 5.2](#task-52-structured-mcq-generation-service-gemini-api).
+- [x] **Target Goal:** Create exam workspace state returned in a clean API payload.
+- [x] **Dependencies:** [Task 5.2](#task-52-structured-mcq-generation-service-gemini-api).
 
 ### Task 6.2: Answer Submission & Time Verification Engine
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Implement `/api/exams/sessions/{id}/submit-answer` logging selections to `exam_responses`.
   - Validate timed rules: if current time exceeds `started_at` + `time_limit_seconds`, auto-lock changes and reject request.
-- [ ] **Target Goal:** Answer logging operates seamlessly; prevents tampering with time constraints.
-- [ ] **Dependencies:** [Task 6.1](#task-61-exam-session-initializer-api).
+- [x] **Target Goal:** Answer logging operates seamlessly; prevents tampering with time constraints.
+- [x] **Dependencies:** [Task 6.1](#task-61-exam-session-initializer-api).
 
 ### Task 6.3: Simulated Exam Interface UI
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Build React components: `QuestionCard`, `TimerBar` (updates remaining time, automatically locks on 0), and `NavigationShell`.
-- [ ] **Target Goal:** Responsive layout for navigating between questions and answering.
-- [ ] **Dependencies:** [Task 6.2](#task-62-answer-submission--time-verification-engine).
+- [x] **Target Goal:** Responsive layout for navigating between questions and answering.
+- [x] **Dependencies:** [Task 6.2](#task-62-answer-submission--time-verification-engine).
 
 ---
 

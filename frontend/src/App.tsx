@@ -17,8 +17,6 @@ import {
   Sparkles,
   BookOpen,
   Tag,
-  ChevronDown,
-  ChevronUp,
   X
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
@@ -42,21 +40,7 @@ interface Document {
   ingested_at: string;
 }
 
-interface QuestionOption {
-  id: string;
-  option_text: string;
-  is_correct: boolean;
-  option_order: number;
-}
 
-interface GeneratedQuestion {
-  id: string;
-  question_text: string;
-  explanation: string | null;
-  difficulty: string;
-  options: QuestionOption[];
-  tags: string[];
-}
 
 function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
@@ -95,9 +79,19 @@ function App() {
   const [examTagInput, setExamTagInput] = useState<string>('');
   const [examTagFilters, setExamTagFilters] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
-  const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+
+  // ---- Exam Simulator State (Phase 6) ----
+  const [examMode, setExamMode] = useState<'practice' | 'timed'>('practice');
+  const [examTimeLimitMinutes, setExamTimeLimitMinutes] = useState<number>(10);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [sessionQuestions, setSessionQuestions] = useState<any[]>([]);
+  const [selectedAnswers, setSelectedAnswers] = useState<{ [questionId: string]: string }>({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
+  const [examTimeRemaining, setExamTimeRemaining] = useState<number | null>(null);
+  const [sessionCompletedResults, setSessionCompletedResults] = useState<any | null>(null);
+  const [practiceFeedback, setPracticeFeedback] = useState<{ [questionId: string]: { isCorrect: boolean; correctOptionId: string } }>({});
+  const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<{ [questionId: string]: boolean }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<any>(null);
@@ -411,13 +405,31 @@ function App() {
     setExamTagFilters(prev => prev.filter(t => t !== tag));
   };
 
-  // ---- Generate Questions ----
-  const handleGenerateQuestions = async () => {
+
+
+  // ---- Exam Simulator Timing & Actions (Phase 6) ----
+  useEffect(() => {
+    if (activeSession && activeSession.status === 'in_progress' && examMode === 'timed' && examTimeRemaining !== null) {
+      if (examTimeRemaining <= 0) {
+        handleCompleteExam();
+        return;
+      }
+      const timer = setTimeout(() => {
+        setExamTimeRemaining(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSession, examTimeRemaining, examMode]);
+
+  const handleStartExamSession = async () => {
     if (!selectedTopic || !token) return;
-    setIsGenerating(true);
-    setGeneratedQuestions([]);
+    setIsStartingSession(true);
+    setSessionCompletedResults(null);
+    setPracticeFeedback({});
+    setSelectedAnswers({});
+    setCurrentQuestionIndex(0);
     try {
-      const res = await fetch(`${apiUrl}/api/questions/generate`, {
+      const res = await fetch(`${apiUrl}/api/exams/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -425,24 +437,116 @@ function App() {
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
-          count: examCount,
-          difficulty: examDifficulty,
-          tag_filters: examTagFilters
+          mode: examMode,
+          difficulty_filter: examDifficulty,
+          tag_filter: examTagFilters,
+          question_count: examCount,
+          time_limit_seconds: examMode === 'timed' ? examTimeLimitMinutes * 60 : null
         })
       });
       const data = await res.json();
       if (res.ok) {
-        setGeneratedQuestions(data.questions || []);
-        await fetchTags(selectedTopic.id);
-        showToast(`Generated ${data.generated} question(s) successfully!`, 'success');
+        setActiveSession(data);
+        setSessionQuestions(data.questions || []);
+        setExamTimeRemaining(data.time_limit_seconds);
+        
+        // Prepopulate selections if resume
+        const answers: { [qid: string]: string } = {};
+        const feedback: { [qid: string]: any } = {};
+        if (data.responses) {
+          data.responses.forEach((r: any) => {
+            if (r.selected_option_id) {
+              answers[r.question_id] = r.selected_option_id;
+            }
+            if (r.is_correct !== undefined && r.is_correct !== null) {
+              feedback[r.question_id] = {
+                isCorrect: r.is_correct,
+                correctOptionId: r.correct_option_id
+              };
+            }
+          });
+        }
+        setSelectedAnswers(answers);
+        setPracticeFeedback(feedback);
+        showToast("Simulation session started!", "success");
       } else {
-        showToast(data.detail || 'Generation failed.', 'error');
+        showToast(data.detail || "Failed to start exam session.", "error");
       }
     } catch (err) {
-      console.error('Error generating questions:', err);
-      showToast('Network error during question generation.', 'error');
+      console.error("Error starting exam session:", err);
+      showToast("Network error starting exam session.", "error");
     } finally {
-      setIsGenerating(false);
+      setIsStartingSession(false);
+    }
+  };
+
+  const handleSelectOption = async (questionId: string, optionId: string) => {
+    if (!activeSession || activeSession.status !== 'in_progress') return;
+
+    if (examMode === 'practice' && practiceFeedback[questionId]) {
+      return; // Already submitted, locked
+    }
+
+    // Optimistically update locally
+    setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
+    setIsSubmittingAnswer(prev => ({ ...prev, [questionId]: true }));
+
+    try {
+      const res = await fetch(`${apiUrl}/api/exams/sessions/${activeSession.id}/submit-answer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          question_id: questionId,
+          selected_option_id: optionId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (examMode === 'practice') {
+          setPracticeFeedback(prev => ({
+            ...prev,
+            [questionId]: {
+              isCorrect: data.is_correct,
+              correctOptionId: data.correct_option_id
+            }
+          }));
+        }
+      } else {
+        showToast(data.detail || "Failed to submit answer.", "error");
+      }
+    } catch (err) {
+      console.error("Error submitting answer:", err);
+      showToast("Network error submitting answer.", "error");
+    } finally {
+      setIsSubmittingAnswer(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
+
+  const handleCompleteExam = async () => {
+    const targetSessionId = activeSession?.id || (sessionCompletedResults?.id);
+    if (!targetSessionId) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/exams/sessions/${targetSessionId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActiveSession(null);
+        setSessionCompletedResults(data);
+        setActiveTab('results'); // jump to results automatically
+        showToast("Session concluded!", "success");
+      } else {
+        showToast(data.detail || "Failed to complete session.", "error");
+      }
+    } catch (err) {
+      console.error("Error completing session:", err);
+      showToast("Network error concluding session.", "error");
     }
   };
 
@@ -459,7 +563,11 @@ function App() {
     setTopics([]);
     setSelectedTopic(null);
     setDocuments([]);
-    setGeneratedQuestions([]);
+    setActiveSession(null);
+    setSessionQuestions([]);
+    setSelectedAnswers({});
+    setPracticeFeedback({});
+    setSessionCompletedResults(null);
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
   };
 
@@ -1097,15 +1205,14 @@ function App() {
           </div>
         )}
 
-        {/* Exam Config Panel — Task 5.3 */}
-        {activeTab === 'exam' && (
+        {/* Exam Config & Simulation Flow */}
+        {activeTab === 'exam' && !activeSession && (
           <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-
             {/* Config Card */}
             <div className="glass-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                 <Sparkles size={22} color="var(--accent-primary)" />
-                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>Question Bank Generator</h2>
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>Exam Simulator Setup</h2>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
@@ -1123,7 +1230,7 @@ function App() {
                         if (topic) setSelectedTopic(topic);
                       }}
                       style={{ width: '100%' }}
-                      disabled={isGenerating}
+                      disabled={isStartingSession}
                     >
                       {topics.length === 0 && <option value="">No topics — create one first</option>}
                       {topics.map((t) => (
@@ -1131,6 +1238,61 @@ function App() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Simulation Mode Selector */}
+                  <div className="form-group">
+                    <label>Simulation Mode</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                      <button
+                        onClick={() => setExamMode('practice')}
+                        style={{
+                          padding: '8px 4px',
+                          borderRadius: '8px',
+                          border: examMode === 'practice' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                          background: examMode === 'practice' ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                          color: examMode === 'practice' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          fontWeight: examMode === 'practice' ? 700 : 400,
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >Practice Mode</button>
+                      <button
+                        onClick={() => setExamMode('timed')}
+                        style={{
+                          padding: '8px 4px',
+                          borderRadius: '8px',
+                          border: examMode === 'timed' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                          background: examMode === 'timed' ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
+                          color: examMode === 'timed' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          fontWeight: examMode === 'timed' ? 700 : 400,
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >Timed Exam</button>
+                    </div>
+                  </div>
+
+                  {/* Timer Config if Timed Mode selected */}
+                  {examMode === 'timed' && (
+                    <div className="form-group fade-in">
+                      <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Time Limit (Minutes)</span>
+                        <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{examTimeLimitMinutes} min</span>
+                      </label>
+                      <input
+                        type="range"
+                        min={1} max={60} step={1}
+                        value={examTimeLimitMinutes}
+                        onChange={(e) => setExamTimeLimitMinutes(Number(e.target.value))}
+                        style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        <span>1 min</span><span>30 min</span><span>60 min</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Question Count */}
                   <div className="form-group">
@@ -1143,7 +1305,7 @@ function App() {
                       min={1} max={50} step={1}
                       value={examCount}
                       onChange={(e) => setExamCount(Number(e.target.value))}
-                      disabled={isGenerating}
+                      disabled={isStartingSession}
                       style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -1159,7 +1321,7 @@ function App() {
                         <button
                           key={d}
                           onClick={() => setExamDifficulty(d)}
-                          disabled={isGenerating}
+                          disabled={isStartingSession}
                           style={{
                             padding: '8px 4px',
                             borderRadius: '8px',
@@ -1167,7 +1329,7 @@ function App() {
                             background: examDifficulty === d ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
                             color: examDifficulty === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
                             fontWeight: examDifficulty === d ? 700 : 400,
-                            cursor: isGenerating ? 'not-allowed' : 'pointer',
+                            cursor: isStartingSession ? 'not-allowed' : 'pointer',
                             fontSize: '0.8rem',
                             textTransform: 'capitalize',
                             transition: 'all 0.15s ease'
@@ -1190,7 +1352,7 @@ function App() {
                           <button
                             key={t}
                             onClick={() => addTagFilter(t)}
-                            disabled={isGenerating || examTagFilters.includes(t)}
+                            disabled={isStartingSession || examTagFilters.includes(t)}
                             style={{
                               padding: '3px 10px',
                               borderRadius: '20px',
@@ -1198,7 +1360,7 @@ function App() {
                               background: examTagFilters.includes(t) ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
                               color: examTagFilters.includes(t) ? 'var(--accent-primary)' : 'var(--text-secondary)',
                               fontSize: '0.75rem',
-                              cursor: examTagFilters.includes(t) || isGenerating ? 'default' : 'pointer',
+                              cursor: examTagFilters.includes(t) || isStartingSession ? 'default' : 'pointer',
                               transition: 'all 0.15s'
                             }}
                           >{t}</button>
@@ -1214,12 +1376,12 @@ function App() {
                         value={examTagInput}
                         onChange={(e) => setExamTagInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTagFilter(examTagInput); } }}
-                        disabled={isGenerating}
+                        disabled={isStartingSession}
                         style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                       />
                       <button
                         onClick={() => addTagFilter(examTagInput)}
-                        disabled={!examTagInput.trim() || isGenerating}
+                        disabled={!examTagInput.trim() || isStartingSession}
                         className="btn btn-secondary"
                         style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '0.82rem' }}
                       ><Plus size={14} /></button>
@@ -1244,18 +1406,18 @@ function App() {
                     )}
                   </div>
 
-                  {/* Generate Button */}
+                  {/* Start Button */}
                   <button
-                    id="btn-generate-questions"
-                    onClick={handleGenerateQuestions}
-                    disabled={isGenerating || !selectedTopic || topics.length === 0}
+                    id="btn-start-exam"
+                    onClick={handleStartExamSession}
+                    disabled={isStartingSession || !selectedTopic || topics.length === 0}
                     className="btn btn-primary"
-                    style={{ width: '100%', gap: '8px' }}
+                    style={{ width: '100%', gap: '8px', background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' }}
                   >
-                    {isGenerating ? (
-                      <><Loader2 size={16} className="animate-spin" /><span>Generating via Gemini...</span></>
+                    {isStartingSession ? (
+                      <><Loader2 size={16} className="animate-spin" /><span>Initializing session...</span></>
                     ) : (
-                      <><Sparkles size={16} /><span>Generate {examCount} MCQ{examCount !== 1 ? 's' : ''}</span></>
+                      <><Sparkles size={16} /><span>Start {examMode === 'timed' ? 'Timed' : 'Practice'} Session ({examCount} Qs)</span></>
                     )}
                   </button>
                 </div>
@@ -1265,9 +1427,10 @@ function App() {
                   <div style={{ padding: '20px', background: 'rgba(99,102,241,0.05)', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.15)' }}>
                     <h4 style={{ margin: '0 0 12px', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}><BookOpen size={16} /> How it works</h4>
                     <ol style={{ paddingLeft: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.8, margin: 0 }}>
-                      <li>Relevant chunks are retrieved from your ingested documents using <strong>pgvector cosine similarity</strong>.</li>
-                      <li>Context blocks are assembled and sent to <strong>Gemini</strong> with a structured JSON output prompt.</li>
-                      <li>Generated MCQs are saved to the question bank with options, explanations, and concept tags.</li>
+                      <li>Matches questions from your **permanent question bank** using your difficulty and concept filters.</li>
+                      <li>Loads them into an active simulation container, freezing ordering to log details.</li>
+                      <li>**Practice Mode** gives immediate explanations and corrections after you select options.</li>
+                      <li>**Timed Exam** hides answers, running a countdown. Concluding the session generates a score.</li>
                     </ol>
                   </div>
 
@@ -1281,117 +1444,483 @@ function App() {
                 </div>
               </div>
             </div>
-
-            {/* Generated Questions Preview */}
-            {generatedQuestions.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={20} color="var(--accent-teal)" />
-                    {generatedQuestions.length} Question{generatedQuestions.length !== 1 ? 's' : ''} Generated
-                  </h3>
-                  <button
-                    onClick={() => setGeneratedQuestions([])}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}
-                  ><X size={14} /> Clear</button>
-                </div>
-
-                {generatedQuestions.map((q, qi) => (
-                  <div key={q.id} className="glass-card" style={{ padding: '20px' }}>
-                    {/* Question header */}
-                    <div
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer', gap: '16px' }}
-                      onClick={() => setExpandedQuestion(expandedQuestion === q.id ? null : q.id)}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Q{qi + 1}</span>
-                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.5 }}>{q.question_text}</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                        <span style={{
-                          padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600,
-                          background: q.difficulty === 'easy' ? 'rgba(20,184,166,0.12)' : q.difficulty === 'hard' ? 'rgba(239,68,68,0.12)' : 'rgba(168,85,247,0.12)',
-                          color: q.difficulty === 'easy' ? 'var(--accent-teal)' : q.difficulty === 'hard' ? '#ef4444' : 'var(--accent-secondary)',
-                          textTransform: 'capitalize'
-                        }}>{q.difficulty}</span>
-                        {expandedQuestion === q.id ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
-                      </div>
-                    </div>
-
-                    {/* Expanded: options + explanation */}
-                    {expandedQuestion === q.id && (
-                      <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                        {/* Options */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                          {q.options.sort((a, b) => a.option_order - b.option_order).map((opt) => (
-                            <div key={opt.id} style={{
-                              display: 'flex', alignItems: 'flex-start', gap: '10px',
-                              padding: '10px 14px', borderRadius: '8px',
-                              background: opt.is_correct ? 'rgba(20,184,166,0.08)' : 'rgba(255,255,255,0.02)',
-                              border: opt.is_correct ? '1px solid rgba(20,184,166,0.3)' : '1px solid var(--border-color)'
-                            }}>
-                              <span style={{
-                                width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.7rem', fontWeight: 700,
-                                background: opt.is_correct ? 'rgba(20,184,166,0.2)' : 'rgba(255,255,255,0.05)',
-                                color: opt.is_correct ? 'var(--accent-teal)' : 'var(--text-muted)'
-                              }}>
-                                {String.fromCharCode(65 + opt.option_order)}
-                              </span>
-                              <span style={{ fontSize: '0.88rem', color: opt.is_correct ? 'var(--accent-teal)' : 'var(--text-secondary)', lineHeight: 1.5, fontWeight: opt.is_correct ? 600 : 400 }}>
-                                {opt.option_text}
-                              </span>
-                              {opt.is_correct && (
-                                <CheckCircle2 size={15} color="var(--accent-teal)" style={{ marginLeft: 'auto', flexShrink: 0, marginTop: '2px' }} />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Explanation */}
-                        {q.explanation && (
-                          <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', marginBottom: '12px' }}>
-                            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                              <strong style={{ color: 'var(--accent-primary)' }}>Explanation: </strong>{q.explanation}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Tags */}
-                        {q.tags.length > 0 && (
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {q.tags.map(t => (
-                              <span key={t} style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', background: 'rgba(168,85,247,0.1)', color: 'var(--accent-secondary)', border: '1px solid rgba(168,85,247,0.2)' }}>{t}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* No questions yet placeholder */}
-            {generatedQuestions.length === 0 && !isGenerating && (
-              <div className="glass-card" style={{ textAlign: 'center', padding: '48px 40px', opacity: 0.7 }}>
-                <Sparkles size={40} color="var(--accent-primary)" style={{ marginBottom: '16px', opacity: 0.5 }} />
-                <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Configure your options above and click <strong>Generate MCQs</strong> to create your question bank.</p>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Mock results screen */}
+        {/* Active Exam Simulation Container */}
+        {activeTab === 'exam' && activeSession && (
+          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Header: Mode, Timer, Progress */}
+            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent-primary)', fontWeight: 700 }}>
+                  Exam in Progress ({activeSession.mode === 'timed' ? 'Timed Session' : 'Practice Session'})
+                </span>
+                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem' }}>{selectedTopic?.name}</h3>
+              </div>
+              
+              {activeSession.mode === 'timed' && examTimeRemaining !== null && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Clock size={20} color={examTimeRemaining < 60 ? '#ef4444' : 'var(--text-secondary)'} />
+                  <span style={{ 
+                    fontSize: '1.4rem', 
+                    fontFamily: 'monospace', 
+                    fontWeight: 700, 
+                    color: examTimeRemaining < 60 ? '#ef4444' : 'var(--text-primary)' 
+                  }}>
+                    {Math.floor(examTimeRemaining / 60)}:{(examTimeRemaining % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Timer Progress Bar */}
+            {activeSession.mode === 'timed' && examTimeRemaining !== null && activeSession.time_limit_seconds && (
+              <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '-12px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${(examTimeRemaining / activeSession.time_limit_seconds) * 100}%`,
+                  background: examTimeRemaining < 60 ? '#ef4444' : 'var(--accent-primary)',
+                  transition: 'width 1s linear'
+                }} />
+              </div>
+            )}
+
+            {/* Split layout: Question Card & Navigation Shell */}
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px', alignItems: 'start' }}>
+              
+              {/* Question Card */}
+              {sessionQuestions.length > 0 && currentQuestionIndex < sessionQuestions.length && (
+                <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* Card Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      Question {currentQuestionIndex + 1} of {sessionQuestions.length}
+                    </span>
+                    <span style={{ 
+                      padding: '3px 10px', 
+                      borderRadius: '12px', 
+                      fontSize: '0.72rem', 
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      background: sessionQuestions[currentQuestionIndex].difficulty === 'easy' ? 'rgba(20,184,166,0.1)' 
+                        : sessionQuestions[currentQuestionIndex].difficulty === 'hard' ? 'rgba(239,68,68,0.1)'
+                        : 'rgba(168,85,247,0.1)',
+                      color: sessionQuestions[currentQuestionIndex].difficulty === 'easy' ? 'var(--accent-teal)' 
+                        : sessionQuestions[currentQuestionIndex].difficulty === 'hard' ? '#ef4444'
+                        : 'var(--accent-secondary)'
+                    }}>
+                      {sessionQuestions[currentQuestionIndex].difficulty}
+                    </span>
+                  </div>
+
+                  {/* Question Text */}
+                  <p style={{ fontSize: '1.1rem', fontWeight: 600, lineHeight: 1.6, color: 'var(--text-primary)', margin: 0 }}>
+                    {sessionQuestions[currentQuestionIndex].question_text}
+                  </p>
+
+                  {/* Question Options */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {sessionQuestions[currentQuestionIndex].options
+                      .map((opt: any) => {
+                        const qid = sessionQuestions[currentQuestionIndex].id;
+                        const isSelected = selectedAnswers[qid] === opt.id;
+                        
+                        // Practice feedback styles
+                        const feedback = practiceFeedback[qid];
+                        const showCorrectness = feedback !== undefined;
+                        const isCorrectOption = showCorrectness && feedback.correctOptionId === opt.id;
+                        const isSelectedIncorrect = showCorrectness && isSelected && !feedback.isCorrect;
+
+                        let bg = 'rgba(255,255,255,0.02)';
+                        let border = '1px solid var(--border-color)';
+                        let color = 'var(--text-secondary)';
+
+                        if (isSelected && !showCorrectness) {
+                          bg = 'rgba(99, 102, 241, 0.12)';
+                          border = '1px solid var(--accent-primary)';
+                          color = 'var(--accent-primary)';
+                        } else if (isCorrectOption) {
+                          bg = 'rgba(20, 184, 166, 0.12)';
+                          border = '1px solid rgba(20, 184, 166, 0.4)';
+                          color = 'var(--accent-teal)';
+                        } else if (isSelectedIncorrect) {
+                          bg = 'rgba(239, 68, 68, 0.12)';
+                          border = '1px solid rgba(239, 68, 68, 0.4)';
+                          color = '#ef4444';
+                        }
+
+                        return (
+                          <button
+                            key={opt.id}
+                            disabled={showCorrectness || isSubmittingAnswer[qid]}
+                            onClick={() => handleSelectOption(qid, opt.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '16px 20px',
+                              borderRadius: '10px',
+                              background: bg,
+                              border: border,
+                              color: color,
+                              cursor: (showCorrectness || isSubmittingAnswer[qid]) ? 'default' : 'pointer',
+                              textAlign: 'left',
+                              fontSize: '0.95rem',
+                              fontWeight: isSelected ? 600 : 400,
+                              transition: 'all 0.15s ease',
+                              width: '100%'
+                            }}
+                          >
+                            <span style={{ 
+                              width: '24px', 
+                              height: '24px', 
+                              borderRadius: '50%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              background: isSelected ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                              color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                              flexShrink: 0
+                            }}>
+                              {String.fromCharCode(65 + opt.option_order)}
+                            </span>
+                            <span style={{ flex: 1 }}>{opt.option_text}</span>
+                            {isCorrectOption && <CheckCircle2 size={18} color="var(--accent-teal)" style={{ flexShrink: 0 }} />}
+                            {isSelectedIncorrect && <X size={18} color="#ef4444" style={{ flexShrink: 0 }} />}
+                          </button>
+                        );
+                      })
+                    }
+                  </div>
+
+                  {/* Immediate Explanation (Practice Mode only, after answering) */}
+                  {examMode === 'practice' && practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (
+                    <div className="fade-in" style={{ 
+                      padding: '16px 20px', 
+                      background: 'rgba(99,102,241,0.06)', 
+                      borderRadius: '10px', 
+                      border: '1px solid rgba(99,102,241,0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.9rem' }}>
+                        <Sparkles size={16} />
+                        <span>Practice Mode Explanation</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                        {sessionQuestions[currentQuestionIndex].explanation || "No explanation provided for this question."}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                    <button
+                      disabled={currentQuestionIndex === 0}
+                      onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                      className="btn btn-secondary"
+                      style={{ padding: '10px 20px' }}
+                    >
+                      Previous
+                    </button>
+                    
+                    {currentQuestionIndex < sessionQuestions.length - 1 ? (
+                      <button
+                        onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                        className="btn btn-secondary"
+                        style={{ padding: '10px 20px' }}
+                      >
+                        Next
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCompleteExam}
+                        className="btn btn-primary"
+                        style={{ padding: '10px 24px', background: 'linear-gradient(135deg, var(--accent-teal) 0%, var(--accent-primary) 100%)' }}
+                      >
+                        Conclude Exam
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
+              {/* Navigation Shell */}
+              <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Question Navigation
+                </h4>
+                
+                {/* Question Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                  {sessionQuestions.map((q, idx) => {
+                    const isCurrent = idx === currentQuestionIndex;
+                    const isAnswered = selectedAnswers[q.id] !== undefined;
+
+                    let bg = 'rgba(255,255,255,0.02)';
+                    let border = '1px solid var(--border-color)';
+                    let color = 'var(--text-secondary)';
+
+                    if (isCurrent) {
+                      bg = 'rgba(99, 102, 241, 0.15)';
+                      border = '2px solid var(--accent-primary)';
+                      color = 'var(--accent-primary)';
+                    } else if (isAnswered) {
+                      bg = 'rgba(20, 184, 166, 0.1)';
+                      border = '1px solid rgba(20, 184, 166, 0.3)';
+                      color = 'var(--accent-teal)';
+                    }
+
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => setCurrentQuestionIndex(idx)}
+                        style={{
+                          aspectRatio: '1',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          background: bg,
+                          border: border,
+                          color: color,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(20, 184, 166, 0.2)', border: '1px solid var(--accent-teal)' }}></div>
+                    <span>Answered</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}></div>
+                    <span>Unanswered</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCompleteExam}
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: '16px', background: '#ef4444', border: 'none' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                >
+                  Conclude & Submit
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Results Screen & Scorecard */}
         {activeTab === 'results' && (
-          <div className="fade-in glass-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
-            <TrendingUp size={48} color="var(--accent-secondary)" style={{ marginBottom: '16px' }} />
-            <h2 style={{ marginBottom: '12px' }}>No attempt records found</h2>
-            <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 24px' }}>
-              Complete your first exam practice or simulation to populate metrics, score breakdowns, and tag correctness reports on this dashboard.
-            </p>
-            <button onClick={() => setActiveTab('setup')} className="btn btn-secondary">Prepare First Exam</button>
+          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            {sessionCompletedResults ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                {/* Scorecard Hero Banner */}
+                <div className="glass-card" style={{ 
+                  background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%)',
+                  border: '1px solid rgba(20, 184, 166, 0.25)',
+                  padding: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-around',
+                  borderRadius: '16px',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  {/* Left Hero Details */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 2 }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--accent-teal)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Performance Report Card
+                    </span>
+                    <h2 style={{ margin: 0, fontSize: '2.2rem', fontFamily: 'var(--font-display)' }}>Exam Completed!</h2>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '400px' }}>
+                      Great work! Review your question attempts and explanations below to strengthen your weak concepts.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                      <button onClick={() => { setSessionCompletedResults(null); setActiveTab('exam'); }} className="btn btn-primary" style={{ background: 'var(--accent-teal)' }}>
+                        Take Another Exam
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Circular Score Visual Indicator */}
+                  <div style={{ 
+                    width: '180px', 
+                    height: '180px', 
+                    borderRadius: '50%', 
+                    background: 'radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%)',
+                    border: '8px solid rgba(255,255,255,0.03)',
+                    borderTopColor: 'var(--accent-teal)',
+                    borderRightColor: sessionCompletedResults.score >= 50 ? 'var(--accent-teal)' : 'rgba(255,255,255,0.03)',
+                    borderBottomColor: sessionCompletedResults.score >= 75 ? 'var(--accent-teal)' : 'rgba(255,255,255,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                    boxShadow: '0 0 40px rgba(20, 184, 166, 0.2)'
+                  }}>
+                    <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>
+                      {sessionCompletedResults.score}%
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>
+                      Correct Rate
+                    </span>
+                  </div>
+                </div>
+
+                {/* Score Stats Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                  <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Session Mode</span>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--accent-primary)' }}>
+                      {sessionCompletedResults.mode}
+                    </p>
+                  </div>
+                  <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Questions</span>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {sessionCompletedResults.question_count}
+                    </p>
+                  </div>
+                  <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Correct Answers</span>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-teal)' }}>
+                      {sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
+                    </p>
+                  </div>
+                  <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Incorrect/Skipped</span>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#ef4444' }}>
+                      {sessionCompletedResults.question_count - sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Score Details Review */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.4rem' }}>Detailed Question Review</h3>
+
+                  {sessionCompletedResults.questions.map((q: any, qi: number) => {
+                    const response = sessionCompletedResults.responses.find((r: any) => r.question_id === q.id);
+                    const selectedOptId = response?.selected_option_id;
+                    const isCorrect = response?.is_correct || false;
+                    const correctOptId = response?.correct_option_id;
+
+                    return (
+                      <div key={q.id} className="glass-card" style={{ padding: '24px', borderLeft: isCorrect ? '4px solid var(--accent-teal)' : '4px solid #ef4444' }}>
+                        
+                        {/* Header Details */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Q{qi + 1} Review</span>
+                          <span style={{ 
+                            fontSize: '0.78rem', padding: '3px 10px', borderRadius: '12px', fontWeight: 600,
+                            background: isCorrect ? 'rgba(20,184,166,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: isCorrect ? 'var(--accent-teal)' : '#ef4444'
+                          }}>
+                            {isCorrect ? 'Correct' : selectedOptId ? 'Incorrect' : 'Skipped / Unanswered'}
+                          </span>
+                        </div>
+
+                        {/* Question Text */}
+                        <p style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{q.question_text}</p>
+
+                        {/* Options */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                          {q.options.map((opt: any) => {
+                            const isSelected = selectedOptId === opt.id;
+                            const isCorrectOpt = correctOptId === opt.id;
+
+                            let bg = 'rgba(255,255,255,0.02)';
+                            let border = '1px solid var(--border-color)';
+                            let color = 'var(--text-secondary)';
+
+                            if (isSelected && isCorrectOpt) {
+                              bg = 'rgba(20,184,166,0.12)';
+                              border = '1px solid rgba(20,184,166,0.4)';
+                              color = 'var(--accent-teal)';
+                            } else if (isSelected && !isCorrectOpt) {
+                              bg = 'rgba(239,68,68,0.12)';
+                              border = '1px solid rgba(239,68,68,0.4)';
+                              color = '#ef4444';
+                            } else if (isCorrectOpt) {
+                              bg = 'rgba(20,184,166,0.08)';
+                              border = '1px solid rgba(20,184,166,0.3)';
+                              color = 'var(--accent-teal)';
+                            }
+
+                            return (
+                              <div key={opt.id} style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '12px 16px', borderRadius: '8px',
+                                background: bg, border: border, color: color,
+                                fontSize: '0.9rem'
+                              }}>
+                                <span style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  background: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.2)',
+                                  color: 'inherit',
+                                  textAlign: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {String.fromCharCode(65 + opt.option_order)}
+                                </span>
+                                <span style={{ flex: 1 }}>{opt.option_text}</span>
+                                {isCorrectOpt && <CheckCircle2 size={16} color="var(--accent-teal)" />}
+                                {isSelected && !isCorrectOpt && <X size={16} color="#ef4444" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Explanation block */}
+                        {q.explanation && (
+                          <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                              <strong style={{ color: 'var(--accent-primary)' }}>Explanation:</strong> {q.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
+                <TrendingUp size={48} color="var(--accent-secondary)" style={{ marginBottom: '16px' }} />
+                <h2 style={{ marginBottom: '12px' }}>No attempt records found</h2>
+                <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 24px' }}>
+                  Complete your first exam practice or simulation to populate metrics, score breakdowns, and tag correctness reports on this dashboard.
+                </p>
+                <button onClick={() => setActiveTab('exam')} className="btn btn-secondary">Prepare First Exam</button>
+              </div>
+            )}
           </div>
         )}
       </main>

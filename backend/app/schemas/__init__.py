@@ -9,3 +9,12 @@ from app.schemas.question import (
     QuestionOptionResponse,
     TagResponse,
 )
+from app.schemas.exam import (
+    ExamQuestionOptionResponse,
+    ExamQuestionResponse,
+    ExamSessionCreate,
+    ExamResponseCreate,
+    ExamResponseStatus,
+    ExamSessionResponse,
+)
+
