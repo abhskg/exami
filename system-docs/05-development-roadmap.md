@@ -120,39 +120,39 @@ This document maintains the step-by-step roadmap for implementing the Local-Firs
 
 ### Task 4.1: Implement File Storage & Upload APIs
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Build a route `/api/documents/upload` accepting files.
   - Save file to directory: `./data/uploads/{user_id}/{document_id}.pdf`.
   - Validate file size limit (15MB) and type.
   - Insert record in `documents` with status `pending`.
-- [ ] **Target Goal:** Uploaded files write to local folder successfully and create database metadata.
-- [ ] **Dependencies:** [Task 2.3](#task-23-create-fastapi-current-user-dependency) (for user isolation context) & [Task 3.2](#task-32-database-initialization-script).
+- [x] **Target Goal:** Uploaded files write to local folder successfully and create database metadata.
+- [x] **Dependencies:** [Task 2.3](#task-23-create-fastapi-current-user-dependency) (for user isolation context) & [Task 3.2](#task-32-database-initialization-script).
 
 ### Task 4.2: Build Background Worker & Job State Engine
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Create a simple jobs schema in DB (`jobs` table with `status`, `task_type`, `progress`).
   - Wire up a FastAPI background task handler.
   - Create `/api/jobs/{job_id}` status endpoints.
-- [ ] **Target Goal:** API triggers async processing and responds immediately while the job runs in background.
-- [ ] **Dependencies:** [Task 3.2](#task-32-database-initialization-script).
+- [x] **Target Goal:** API triggers async processing and responds immediately while the job runs in background.
+- [x] **Dependencies:** [Task 3.2](#task-32-database-initialization-script).
 
 ### Task 4.3: Implement Parser & Embedder Pipeline (Gemini Integration)
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Build PDF/text processing functions.
   - Integrate Gemini Embeddings API (via `google-genai` SDK) to vectorize extracted text chunks.
   - Write parsed chunks and vector values directly to the `content_chunks` table.
-- [ ] **Target Goal:** Extracted text is successfully chunked, vectorized, and stored in pgvector columns.
-- [ ] **Dependencies:** [Task 4.2](#task-42-build-background-worker-job-state-engine).
+- [x] **Target Goal:** Extracted text is successfully chunked, vectorized, and stored in pgvector columns.
+- [x] **Dependencies:** [Task 4.2](#task-42-build-background-worker-job-state-engine).
 
 ### Task 4.4: Ingestion UI Wizard
 
-- [ ] **Action Steps:**
+- [x] **Action Steps:**
   - Build the React file upload drop zone.
   - Wire up polling requests calling `/api/jobs/{job_id}` to show progress bars.
-- [ ] **Target Goal:** Visual representation of uploading, parsing, and successful chunk storage indicators.
-- [ ] **Dependencies:** [Task 4.1](#task-41-implement-file-storage--upload-apis) & [Task 4.2](#task-42-build-background-worker-job-state-engine).
+- [x] **Target Goal:** Visual representation of uploading, parsing, and successful chunk storage indicators.
+- [x] **Dependencies:** [Task 4.1](#task-41-implement-file-storage--upload-apis) & [Task 4.2](#task-42-build-background-worker-job-state-engine).
 
 ---
 

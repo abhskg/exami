@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Schema Initialization Script (Task 3.2)**: Added a database initializer command (`python -m app.init_db`) that runs `CREATE EXTENSION IF NOT EXISTS vector` before mapping ORM metadata. Wired it into FastAPI lifespan hooks and unit test database fixture configurations.
 - **Database Port Mapping & Configuration**: Changed PostgreSQL default port mapping in `docker-compose.yml` from 5432 to 5434 to prevent conflicts with native Windows services, and updated backend `.env` variables accordingly.
 - **Model Integrity Tests**: Created transactional validation checks in `backend/app/tests/test_models.py` verifying relationships, unique constraints, and cascade delete rules.
+- **Document Ingestion & Upload APIs (Task 4.1)**: Developed `POST /api/documents/upload` accepting PDF, TXT, and MD files under 15MB, saving files locally at `./data/uploads/{user_id}/{document_id}{suffix}`. Created `GET /api/documents/` to fetch topic-specific metadata.
+- **Background Worker & Job State Engine (Task 4.2)**: Created `Job` model and schemas to track task status (`pending`, `running`, `completed`, `failed`), progress metrics (0-100%), and error logs. Implemented FastAPI background task runners and the `GET /api/jobs/{job_id}` status polling endpoint.
+- **Parser & Embedder Pipeline (Task 4.3)**: Integrated the Google GenAI SDK to call the `text-embedding-004` model. Added text extraction from PDFs via `pypdf`, chunking at word boundaries with overlapping segments, and database loading via `pgvector`. Configured mock fallbacks for local/test environments lacking live keys.
+- **Ingestion UI Wizard (Task 4.4)**: Integrated dynamic frontend state in React `App.tsx` including DB-backed topic dropdown selectors, topic creation forms, a drag-and-drop file upload zone, active job progress bars showing current pipeline steps, and dynamic document list status chips.
+- **Ingestion Integration Tests (Task 4.5)**: Created `backend/app/tests/test_ingestion.py` covering size/extension rules, DB record assertions, synchronous task workers, and job polling endpoints.
 
 ## [0.1.1] - 2026-06-22
 
