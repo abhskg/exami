@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Loader (Task 1.1)**: Added a configuration loader utilizing `pydantic-settings` to dynamically parse and validate environments from a `.env` file, and integrated it into `backend/app/main.py`.
 - **Validation Tests**: Introduced configuration and validation tests under `backend/app/tests/test_config.py`.
 - **SQLAlchemy Connection Pool (Task 1.2)**: Initialized SQLAlchemy connection pool engine with standard local settings (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`) in `backend/app/core/database.py` and implemented the FastAPI dependency generator `get_db()`.
+- **Security & Hashing Utilities (Task 2.1)**: Built password hashing and verification utilities using `bcrypt` directly to ensure robust security, and python-jose wrappers for encoding/decoding JWT access tokens. Added unit tests under `backend/app/tests/test_security.py`.
+- **Auth Routers & User Models (Task 2.2)**: Defined the relational `User` database model mapping to the `users` table, created Pydantic validation schemas (`UserCreate`, `UserResponse`, `UserLogin`, `Token`, `TokenData`), and implemented `/api/auth/register` and `/api/auth/login` endpoints. Added integration tests under `backend/app/tests/test_auth.py`.
+- **FastAPI Current User Dependency (Task 2.3)**: Built the `get_current_user` dependency utilizing `OAuth2PasswordBearer` to extract and validate bearer tokens, decode client credentials, and resolve user contexts. Integrated a prototype endpoint `/api/users/me` and added dependency tests in `backend/app/tests/test_deps.py`.
 
 ## [0.1.0] - 2026-06-22
 
