@@ -23,6 +23,7 @@ htmlcov/
 # Local data & uploads (crucial for local-first storage)
 data/
 backend/data/
+ui-design/
 
 # Environments & Secrets
 .env

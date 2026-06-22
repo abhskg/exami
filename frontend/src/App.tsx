@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  BookOpen, 
   Settings, 
-  HelpCircle, 
   ChevronRight, 
   Layers, 
   CheckCircle2, 
@@ -10,19 +8,38 @@ import {
   TrendingUp, 
   Database,
   Upload,
-  AlertTriangle,
   FolderOpen,
-  FileText
+  FileText,
+  LogOut
 } from 'lucide-react';
+import { AuthPage } from './pages/AuthPage';
 
 function App() {
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [user, setUser] = useState<any | null>(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results'>('dashboard');
   const [dbConnected, setDbConnected] = useState<boolean>(false);
   const [selectedTopic, setSelectedTopic] = useState<string>('DSA & System Design');
-  const [filesUploaded, setFilesUploaded] = useState<Array<{name: string, size: string, status: string}>>([
-    { name: "01-system-architecture.md", size: "11.2 KB", status: "Imported" },
-    { name: "03-data-schema-design.md", size: "10.9 KB", status: "Imported" }
-  ]);
+  const [filesUploaded] = useState<Array<{name: string, size: string, status: string}>>([]);
+
+  const handleAuthSuccess = (newToken: string, newUser: any) => {
+    setToken(newToken);
+    setUser(newUser);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+  };
+
+  if (!token) {
+    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -55,7 +72,7 @@ function App() {
               EP
             </div>
             <div>
-              <h1 style={{ fontSize: '1.15rem', margin: 0, padding: 0, background: 'none', webkitTextFillColor: 'initial', color: 'var(--text-primary)' }}>ExamPrep AI</h1>
+              <h1 style={{ fontSize: '1.15rem', margin: 0, padding: 0, background: 'none', WebkitTextFillColor: 'initial', color: 'var(--text-primary)' }}>ExamPrep AI</h1>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Local-First MVP</span>
             </div>
           </div>
@@ -201,6 +218,36 @@ function App() {
             {dbConnected ? 'Disconnect DB' : 'Simulate Connect'}
           </button>
         </div>
+
+        {/* Logout Button */}
+        <button 
+          onClick={handleLogout}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            width: '100%',
+            padding: '12px 16px',
+            marginTop: '16px',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'rgba(239, 68, 68, 0.05)',
+            color: '#ef4444',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontWeight: 600,
+            transition: 'var(--transition-fast)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
+          }}
+        >
+          <LogOut size={18} />
+          <span>Logout</span>
+        </button>
       </aside>
 
       {/* Main Panel */}
@@ -211,10 +258,37 @@ function App() {
             <span style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600, textTransform: 'uppercase' }}>Workspace: local_host_dev</span>
             <h2 style={{ fontSize: '1.8rem', fontFamily: 'var(--font-display)', margin: 0 }}>Active Subject: {selectedTopic}</h2>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {/* Database status widget */}
             <div className="glass-card" style={{ padding: '8px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dbConnected ? 'var(--accent-teal)' : '#f59e0b' }}></div>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status: {dbConnected ? 'Online' : 'Configured'}</span>
+            </div>
+            
+            {/* User Profile widget */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px', borderLeft: '1px solid var(--border-color)' }}>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  {user?.display_name || user?.email?.split('@')[0]}
+                </p>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
+                  {user?.plan_tier ? `${user.plan_tier.toUpperCase()} Member` : 'Free Scholar'}
+                </p>
+              </div>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                border: '2px solid var(--accent-primary-glow)',
+                overflow: 'hidden',
+                background: 'rgba(255,255,255,0.05)'
+              }}>
+                <img
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuARmHieBq0AtO28rAhGCQalLv-ogF1Zu5wy0dcWHBEKZNP6LpXLW5sf97h2d9uCWhoYXf5rEHGbT6RTUtN-23wHvh3a7gwNWW4T6hzLx0a15mPrT7J6DmHt_MpRzEbKJbIjrZgq9Adg-Wy6AqfpSTD6hKu3PiE6FHuIRafHFRSTL_lMJl8PTQpSsVIcSlUggAf81z89uLzqG2P6uaGL8FBZqhpyc4a74x9XFOB_QuByoSJaWNcHqts2oGUsXIuWBTz1WHVbUqw7sRXg"
+                  alt="Avatar"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
             </div>
           </div>
         </header>
@@ -371,20 +445,34 @@ function App() {
               <div>
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Ingested Documents list</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {filesUploaded.map((file, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <FileText size={18} color="var(--accent-secondary)" />
-                        <div>
-                          <strong style={{ fontSize: '0.85rem', display: 'block' }}>{file.name}</strong>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{file.size}</span>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--accent-teal)' }}>
-                        {file.status}
-                      </span>
+                  {filesUploaded.length === 0 ? (
+                    <div style={{
+                      padding: '24px',
+                      textAlign: 'center',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px dashed var(--border-color)',
+                      borderRadius: '8px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem'
+                    }}>
+                      No documents ingested yet. Upload a syllabus or study material to begin.
                     </div>
-                  ))}
+                  ) : (
+                    filesUploaded.map((file, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <FileText size={18} color="var(--accent-secondary)" />
+                          <div>
+                            <strong style={{ fontSize: '0.85rem', display: 'block' }}>{file.name}</strong>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{file.size}</span>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--accent-teal)' }}>
+                          {file.status}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
