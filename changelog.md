@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-22
+
 ### Added
 - **Settings Loader (Task 1.1)**: Added a configuration loader utilizing `pydantic-settings` to dynamically parse and validate environments from a `.env` file, and integrated it into `backend/app/main.py`.
 - **Validation Tests**: Introduced configuration and validation tests under `backend/app/tests/test_config.py`.
