@@ -12,7 +12,11 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    # Ensure tables are created in the database
+    # Ensure pgvector extension and tables are created in the database
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+    import app.models
     Base.metadata.create_all(bind=engine)
     yield
 

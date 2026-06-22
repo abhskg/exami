@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Database Models & Relationships (Task 3.1)**: Created SQLAlchemy ORM models mapping `Topic`, `Document`, `ContentChunk`, `Tag`, `Question`, `QuestionOption`, `QuestionSet`, `QuestionSetItem`, `ExamSession`, and `ExamResponse`. Made embedding vector sizes configurable via `EMBEDDING_DIMENSION` defaulting to 768 (Gemini standard).
+- **Schema Initialization Script (Task 3.2)**: Added a database initializer command (`python -m app.init_db`) that runs `CREATE EXTENSION IF NOT EXISTS vector` before mapping ORM metadata. Wired it into FastAPI lifespan hooks and unit test database fixture configurations.
+- **Database Port Mapping & Configuration**: Changed PostgreSQL default port mapping in `docker-compose.yml` from 5432 to 5434 to prevent conflicts with native Windows services, and updated backend `.env` variables accordingly.
+- **Model Integrity Tests**: Created transactional validation checks in `backend/app/tests/test_models.py` verifying relationships, unique constraints, and cascade delete rules.
+
 ## [0.1.1] - 2026-06-22
 
 ### Added

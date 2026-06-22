@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # Database Configuration (PostgreSQL + pgvector)
     DATABASE_URL: str
+    EMBEDDING_DIMENSION: int = 768
 
     # Security
     SECRET_KEY: str

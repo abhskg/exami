@@ -6,11 +6,15 @@ from app.core.database import Base, engine
 from app.api.api import api_router
 
 # Import all models to ensure they are registered on the Base metadata
-from app.models.user import User
+import app.models
+from sqlalchemy import text
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables for the Local-First MVP
+    # Ensure pgvector extension is enabled first
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=engine)
     yield
 
