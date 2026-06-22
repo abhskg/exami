@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Settings Loader (Task 1.1)**: Added a configuration loader utilizing `pydantic-settings` to dynamically parse and validate environments from a `.env` file, and integrated it into `backend/app/main.py`.
+- **Validation Tests**: Introduced configuration and validation tests under `backend/app/tests/test_config.py`.
+- **SQLAlchemy Connection Pool (Task 1.2)**: Initialized SQLAlchemy connection pool engine with standard local settings (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`) in `backend/app/core/database.py` and implemented the FastAPI dependency generator `get_db()`.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added

@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from app.core.config import settings
 
 app = FastAPI(
-    title="AI-Powered Exam Preparation Portal API",
+    title=f"{settings.APP_NAME} API",
     description="Local-first MVP for AI-assisted ingestion, parsing, tag management, and exam practice.",
-    version="0.1.0"
+    version="0.1.0",
+    debug=settings.DEBUG
 )
 
 # CORS configuration for React frontend communication
@@ -20,7 +21,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to the AI-Powered Exam Preparation Portal API",
+        "message": f"Welcome to the {settings.APP_NAME} API",
         "status": "online",
         "docs_url": "/docs"
     }
@@ -29,5 +30,5 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "environment": os.getenv("APP_ENV", "local")
+        "environment": settings.APP_ENV
     }
