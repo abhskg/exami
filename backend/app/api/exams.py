@@ -28,6 +28,8 @@ from app.schemas.exam import (
     ExamQuestionOptionResponse,
     ExamResponseCreate,
     ExamResponseStatus,
+    TagPerformance,
+    ExamSessionResults,
 )
 
 router = APIRouter(prefix="/exams", tags=["exams"])
@@ -400,3 +402,142 @@ def complete_exam_session(
         db.refresh(session)
 
     return _build_session_response(session, db)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/exams/sessions/{id}/results
+# ---------------------------------------------------------------------------
+@router.get("/sessions/{id}/results", response_model=ExamSessionResults)
+def get_exam_session_results(
+    id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Computes and returns the detailed performance analysis for a concluded session.
+    Calculates overall stats and tag-specific metrics.
+    """
+    session = db.query(ExamSession).filter(
+        ExamSession.id == id,
+        ExamSession.user_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam session not found."
+        )
+
+    # Auto-conclude if timed limits have expired
+    if session.status == "in_progress" and session.mode == "timed":
+        now = datetime.now(timezone.utc)
+        elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
+        if elapsed > (session.time_limit_seconds + 5):
+            _complete_session_internal(session, db)
+            db.refresh(session)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot retrieve results for an active timed session. Complete the session first."
+            )
+
+    # Let's count correctness stats
+    correct_count = sum(1 for r in session.responses if r.is_correct)
+    
+    # Identify which question IDs have been answered
+    # Note that an answer might be logged but selected_option_id could be null (skipped)
+    submitted_qids = {r.question_id for r in session.responses if r.selected_option_id is not None}
+    incorrect_count = sum(1 for r in session.responses if not r.is_correct and r.selected_option_id is not None)
+    
+    # A question is skipped if it has no response logged, or if selected_option_id is None
+    # Let's get the list of all questions in the set to account for untyped/unanswered ones
+    items = (
+        db.query(QuestionSetItem)
+        .filter(QuestionSetItem.question_set_id == session.question_set_id)
+        .all()
+    )
+    
+    total_q_count = len(items)
+    # Double check if total_q_count matches session.question_count
+    if total_q_count == 0:
+        total_q_count = session.question_count
+
+    skipped_count = total_q_count - len(submitted_qids)
+
+    # Compute speeds
+    total_time_taken = sum(r.time_taken_seconds or 0 for r in session.responses)
+    # Average speed is total time taken / count of answered questions
+    answered_count = len(submitted_qids)
+    avg_time_taken = (total_time_taken / answered_count) if answered_count > 0 else 0.0
+
+    # Calculate overall score percentage if not already completed/calculated
+    score = session.score
+    if score is None:
+        if total_q_count > 0:
+            score = round((correct_count / total_q_count) * 100.0, 2)
+        else:
+            score = 0.0
+
+    # Compile tag performance
+    response_by_qid = {r.question_id: r for r in session.responses}
+    
+    tag_stats = {}  # tag_name -> {total, correct, incorrect, skipped}
+    for item in items:
+        q = item.question
+        resp = response_by_qid.get(q.id)
+        
+        is_q_correct = resp.is_correct if resp else False
+        is_q_submitted = (resp.selected_option_id is not None) if resp else False
+        
+        for tag in q.tags:
+            tag_name_lower = tag.name.strip().lower()
+            if tag_name_lower not in tag_stats:
+                tag_stats[tag_name_lower] = {
+                    "tag_name": tag.name,
+                    "total": 0,
+                    "correct": 0,
+                    "incorrect": 0,
+                    "skipped": 0
+                }
+            
+            tag_stats[tag_name_lower]["total"] += 1
+            if is_q_submitted:
+                if is_q_correct:
+                    tag_stats[tag_name_lower]["correct"] += 1
+                else:
+                    tag_stats[tag_name_lower]["incorrect"] += 1
+            else:
+                tag_stats[tag_name_lower]["skipped"] += 1
+
+    tag_performance_list = []
+    for t_lower, stats in tag_stats.items():
+        total_tag_q = stats["total"]
+        pct = round((stats["correct"] / total_tag_q) * 100.0, 2) if total_tag_q > 0 else 0.0
+        tag_performance_list.append(
+            TagPerformance(
+                tag_name=stats["tag_name"],
+                total_questions=total_tag_q,
+                correct_count=stats["correct"],
+                incorrect_count=stats["incorrect"],
+                skipped_count=stats["skipped"],
+                percentage=pct
+            )
+        )
+
+    # Sort tag performance list alphabetically by tag name for UI consistency
+    tag_performance_list.sort(key=lambda tp: tp.tag_name.lower())
+
+    return ExamSessionResults(
+        session_id=session.id,
+        mode=session.mode,
+        status=session.status,
+        score=score,
+        question_count=total_q_count,
+        correct_count=correct_count,
+        incorrect_count=incorrect_count,
+        skipped_count=skipped_count,
+        total_time_taken_seconds=total_time_taken,
+        average_time_taken_seconds=round(avg_time_taken, 2),
+        tag_performance=tag_performance_list
+    )
+

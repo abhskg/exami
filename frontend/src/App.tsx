@@ -92,6 +92,12 @@ function App() {
   const [practiceFeedback, setPracticeFeedback] = useState<{ [questionId: string]: { isCorrect: boolean; correctOptionId: string } }>({});
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<{ [questionId: string]: boolean }>({});
+  
+  // ---- Results Analytics State (Phase 7) ----
+  const [resultsMetrics, setResultsMetrics] = useState<any | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState<boolean>(false);
+  const [isGeneratingWeakAreaQuestions, setIsGeneratingWeakAreaQuestions] = useState<boolean>(false);
+  const [isGeneratingAllQuestions, setIsGeneratingAllQuestions] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<any>(null);
@@ -525,6 +531,120 @@ function App() {
     }
   };
 
+  // ---- Fetch session results metrics (Phase 7) ----
+  const fetchSessionMetrics = async (sessionId: string) => {
+    if (!token) return;
+    setIsLoadingMetrics(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/exams/sessions/${sessionId}/results`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResultsMetrics(data);
+      } else {
+        console.error("Failed to fetch session metrics");
+      }
+    } catch (err) {
+      console.error("Error fetching session metrics:", err);
+    } finally {
+      setIsLoadingMetrics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionCompletedResults?.id) {
+      fetchSessionMetrics(sessionCompletedResults.id);
+    } else {
+      setResultsMetrics(null);
+    }
+  }, [sessionCompletedResults]);
+  // ---- Targeted Practice Weak Areas Trigger (Phase 7) ----
+  const handlePracticeWeakAreas = async () => {
+    if (!selectedTopic || !resultsMetrics || !token) return;
+    
+    // Find weak areas (< 75% correct rate)
+    const weakTags = resultsMetrics.tag_performance
+      .filter((t: any) => t.percentage < 75)
+      .map((t: any) => t.tag_name);
+
+    if (weakTags.length === 0) {
+      showToast("No weak areas identified! Keep up the great work.", "success");
+      return;
+    }
+
+    setIsGeneratingWeakAreaQuestions(true);
+    showToast(`Generating new practice questions targeted for: ${weakTags.join(', ')}...`, "info");
+
+    try {
+      const genRes = await fetch(`${apiUrl}/api/questions/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic_id: selectedTopic.id,
+          count: 5,
+          difficulty: "mixed",
+          tag_filters: weakTags
+        })
+      });
+
+      const genData = await genRes.json();
+      if (genRes.ok) {
+        showToast(`Successfully generated ${genData.generated} new practice questions!`, "success");
+        await fetchTags(selectedTopic.id);
+        
+        // Prepopulate setup and switch tab
+        setExamTagFilters(weakTags);
+        setExamMode('practice');
+        setActiveTab('exam');
+      } else {
+        showToast(genData.detail || "Failed to generate practice questions.", "error");
+      }
+    } catch (err) {
+      console.error("Error generating targeted questions:", err);
+      showToast("Network error generating practice questions.", "error");
+    } finally {
+      setIsGeneratingWeakAreaQuestions(false);
+    }
+  };
+
+  const handleGenerateAllQuestions = async () => {
+    if (!selectedTopic || !token) return;
+    setIsGeneratingAllQuestions(true);
+    showToast("Generating questions using Gemini AI...", "info");
+    try {
+      const res = await fetch(`${apiUrl}/api/questions/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic_id: selectedTopic.id,
+          count: 10,
+          difficulty: "mixed"
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Successfully generated ${data.generated} questions!`, "success");
+        await fetchTags(selectedTopic.id);
+      } else {
+        showToast(data.detail || "Failed to generate questions.", "error");
+      }
+    } catch (err) {
+      console.error("Error generating questions:", err);
+      showToast("Network error generating questions.", "error");
+    } finally {
+      setIsGeneratingAllQuestions(false);
+    }
+  };
+
   const handleCompleteExam = async () => {
     const targetSessionId = activeSession?.id || (sessionCompletedResults?.id);
     if (!targetSessionId) return;
@@ -539,6 +659,7 @@ function App() {
       if (res.ok) {
         setActiveSession(null);
         setSessionCompletedResults(data);
+        fetchSessionMetrics(data.id);
         setActiveTab('results'); // jump to results automatically
         showToast("Session concluded!", "success");
       } else {
@@ -1434,12 +1555,39 @@ function App() {
                     </ol>
                   </div>
 
-                  <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Question Bank Status</strong>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
                       <strong style={{ color: 'var(--text-secondary)' }}>Topic:</strong> {selectedTopic?.name || '—'}<br />
                       <strong style={{ color: 'var(--text-secondary)' }}>Documents ingested:</strong> {documents.filter(d => d.status === 'parsed').length} / {documents.length}<br />
                       <strong style={{ color: 'var(--text-secondary)' }}>Available tags:</strong> {availableTags.length}
                     </p>
+                    <button
+                      onClick={handleGenerateAllQuestions}
+                      disabled={isGeneratingAllQuestions || !selectedTopic}
+                      className="btn btn-secondary"
+                      style={{
+                        width: '100%',
+                        fontSize: '0.82rem',
+                        padding: '8px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {isGeneratingAllQuestions ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          <span>Generate 10 Questions</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1788,7 +1936,7 @@ function App() {
                 </div>
 
                 {/* Score Stats Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px' }}>
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Session Mode</span>
                     <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--accent-primary)' }}>
@@ -1813,6 +1961,159 @@ function App() {
                       {sessionCompletedResults.question_count - sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
                     </p>
                   </div>
+                  <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Average Speed</span>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-secondary)' }}>
+                      {resultsMetrics ? `${resultsMetrics.average_time_taken_seconds}s` : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Concept Mastery Heatmap & Practice Weak Areas Card (Phase 7) */}
+                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Sparkles size={20} color="var(--accent-primary)" />
+                        Concept Mastery Heatmap
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                        Track your topic performance per concept tag. Strong concepts are in green, weak ones require review.
+                      </p>
+                    </div>
+                    
+                    {/* Practice Weak Areas Button */}
+                    {resultsMetrics && resultsMetrics.tag_performance && resultsMetrics.tag_performance.some((t: any) => t.percentage < 75) && (
+                      <button
+                        onClick={handlePracticeWeakAreas}
+                        disabled={isGeneratingWeakAreaQuestions}
+                        className="btn btn-primary"
+                        style={{
+                          background: 'linear-gradient(135deg, #ef4444 0%, var(--accent-secondary) 100%)',
+                          boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 20px',
+                          fontSize: '0.9rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        {isGeneratingWeakAreaQuestions ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Generating Targeted MCQs...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={16} />
+                            <span>Practice Weak Areas ({resultsMetrics.tag_performance.filter((t: any) => t.percentage < 75).length})</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {isLoadingMetrics ? (
+                    <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', color: 'var(--text-secondary)' }}>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Loading concept metrics...</span>
+                    </div>
+                  ) : !resultsMetrics || !resultsMetrics.tag_performance || resultsMetrics.tag_performance.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                      No tags or concept data available for this session's questions.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '8px' }}>
+                      {resultsMetrics.tag_performance.map((tag: any) => {
+                        const pct = tag.percentage;
+                        let bg = 'rgba(255, 255, 255, 0.02)';
+                        let border = '1px solid var(--border-color)';
+                        let color = 'var(--text-secondary)';
+                        let badgeText = 'Developing';
+                        let BadgeIcon = Clock;
+
+                        if (pct >= 75) {
+                          bg = 'rgba(20, 184, 166, 0.1)';
+                          border = '1px solid rgba(20, 184, 166, 0.3)';
+                          color = 'var(--accent-teal)';
+                          badgeText = 'Strong';
+                          BadgeIcon = CheckCircle2;
+                        } else if (pct < 40) {
+                          bg = 'rgba(239, 68, 68, 0.1)';
+                          border = '1px solid rgba(239, 68, 68, 0.3)';
+                          color = '#ef4444';
+                          badgeText = 'Weak';
+                          BadgeIcon = AlertCircle;
+                        } else {
+                          bg = 'rgba(245, 158, 11, 0.1)';
+                          border = '1px solid rgba(245, 158, 11, 0.3)';
+                          color = '#f59e0b';
+                          badgeText = 'Developing';
+                          BadgeIcon = Clock;
+                        }
+
+                        return (
+                          <div
+                            key={tag.tag_name}
+                            style={{
+                              background: bg,
+                              border: border,
+                              borderRadius: '12px',
+                              padding: '12px 18px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              minWidth: '160px',
+                              flex: '1 1 calc(25% - 12px)',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s ease-in-out',
+                              cursor: 'default'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                                {tag.tag_name}
+                              </span>
+                              <BadgeIcon size={14} color={color} />
+                            </div>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
+                              <div>
+                                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
+                                  {pct}%
+                                </span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>
+                                  {tag.correct_count} / {tag.total_questions} correct
+                                </span>
+                              </div>
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '20px',
+                                background: bg,
+                                border: `1px solid ${color}`,
+                                color: color,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                              }}>
+                                {badgeText}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Score Details Review */}

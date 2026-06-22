@@ -16,5 +16,7 @@ from app.schemas.exam import (
     ExamResponseCreate,
     ExamResponseStatus,
     ExamSessionResponse,
+    TagPerformance,
+    ExamSessionResults,
 )
 

@@ -288,3 +288,126 @@ class TestExamEngineAPI:
         # Verify session status changed to completed
         db.refresh(session_record)
         assert session_record.status == "completed"
+
+    def test_results_endpoint_active_timed_fails(self, client, auth_headers, test_topic, seeded_questions):
+        """GET /api/exams/sessions/{id}/results raises 400 for active timed session."""
+        resp_session = client.post(
+            "/api/exams/sessions",
+            json={
+                "topic_id": str(test_topic.id),
+                "mode": "timed",
+                "question_count": 1,
+            },
+            headers=auth_headers,
+        )
+        session_data = resp_session.json()
+        session_id = session_data["id"]
+
+        resp_results = client.get(
+            f"/api/exams/sessions/{session_id}/results",
+            headers=auth_headers,
+        )
+        assert resp_results.status_code == 400
+        assert "Cannot retrieve results for an active timed session" in resp_results.json()["detail"]
+
+    def test_results_endpoint_success(self, client, auth_headers, test_topic, seeded_questions, db):
+        """GET /api/exams/sessions/{id}/results returns compiled stats and tag metrics."""
+        # Let's add some tags to the seeded questions to verify tag performance aggregation
+        from app.models.tag import Tag
+        tag1 = Tag(user_id=seeded_questions[0].user_id, topic_id=test_topic.id, name="arrays")
+        tag2 = Tag(user_id=seeded_questions[0].user_id, topic_id=test_topic.id, name="linked lists")
+        db.add(tag1)
+        db.add(tag2)
+        db.flush()
+
+        seeded_questions[0].tags.append(tag1)
+        seeded_questions[1].tags.append(tag1)
+        seeded_questions[1].tags.append(tag2)
+        seeded_questions[2].tags.append(tag2)
+        db.commit()
+
+        # Create a practice session
+        resp_session = client.post(
+            "/api/exams/sessions",
+            json={
+                "topic_id": str(test_topic.id),
+                "mode": "practice",
+                "question_count": 3,
+            },
+            headers=auth_headers,
+        )
+        session_data = resp_session.json()
+        session_id = session_data["id"]
+
+
+        # Submit answers
+        # Q1: Correct (Option A, id is opt_correct)
+        q1 = session_data["questions"][0]
+        db_q1 = db.query(Question).filter(Question.id == uuid.UUID(q1["id"])).first()
+        q1_correct_opt = next(o for o in db_q1.options if o.is_correct)
+        client.post(
+            f"/api/exams/sessions/{session_id}/submit-answer",
+            json={
+                "question_id": q1["id"],
+                "selected_option_id": str(q1_correct_opt.id),
+                "time_taken_seconds": 10,
+            },
+            headers=auth_headers,
+        )
+
+        # Q2: Incorrect (Option B, is not correct)
+        q2 = session_data["questions"][1]
+        db_q2 = db.query(Question).filter(Question.id == uuid.UUID(q2["id"])).first()
+        q2_incorrect_opt = next(o for o in db_q2.options if not o.is_correct)
+        client.post(
+            f"/api/exams/sessions/{session_id}/submit-answer",
+            json={
+                "question_id": q2["id"],
+                "selected_option_id": str(q2_incorrect_opt.id),
+                "time_taken_seconds": 20,
+            },
+            headers=auth_headers,
+        )
+
+        # Q3: Skipped (no answer submitted)
+
+        # Conclude the session
+        client.post(
+            f"/api/exams/sessions/{session_id}/complete",
+            headers=auth_headers,
+        )
+
+        # Fetch results
+        resp_results = client.get(
+            f"/api/exams/sessions/{session_id}/results",
+            headers=auth_headers,
+        )
+        assert resp_results.status_code == 200, resp_results.text
+        results_data = resp_results.json()
+
+        assert results_data["session_id"] == session_id
+        assert results_data["mode"] == "practice"
+        assert results_data["status"] == "completed"
+        assert results_data["question_count"] == 3
+        assert results_data["correct_count"] == 1
+        assert results_data["incorrect_count"] == 1
+        assert results_data["skipped_count"] == 1
+        assert results_data["total_time_taken_seconds"] == 30
+        assert results_data["average_time_taken_seconds"] == 15.0
+
+        # Verify tag performances
+        tag_perf = {t["tag_name"]: t for t in results_data["tag_performance"]}
+        assert "arrays" in tag_perf
+        assert tag_perf["arrays"]["total_questions"] == 2
+        assert tag_perf["arrays"]["correct_count"] == 1
+        assert tag_perf["arrays"]["incorrect_count"] == 1
+        assert tag_perf["arrays"]["skipped_count"] == 0
+        assert tag_perf["arrays"]["percentage"] == 50.0
+
+        assert "linked lists" in tag_perf
+        assert tag_perf["linked lists"]["total_questions"] == 2
+        assert tag_perf["linked lists"]["correct_count"] == 0
+        assert tag_perf["linked lists"]["incorrect_count"] == 1
+        assert tag_perf["linked lists"]["skipped_count"] == 1
+        assert tag_perf["linked lists"]["percentage"] == 0.0
+

@@ -82,3 +82,31 @@ class ExamSessionResponse(BaseModel):
     responses: list[ExamResponseStatus] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TagPerformance(BaseModel):
+    """Analytics for questions answered under a specific tag."""
+    tag_name: str
+    total_questions: int
+    correct_count: int
+    incorrect_count: int
+    skipped_count: int
+    percentage: float
+
+
+class ExamSessionResults(BaseModel):
+    """Detailed performance analysis dashboard payload for a concluded exam session."""
+    session_id: UUID
+    mode: str
+    status: str
+    score: float
+    question_count: int
+    correct_count: int
+    incorrect_count: int
+    skipped_count: int
+    total_time_taken_seconds: int
+    average_time_taken_seconds: float
+    tag_performance: list[TagPerformance] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
