@@ -11,10 +11,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.api.auth_dependencies import get_current_user
 from app.core.database import get_db
-from app.models.question import Question
+from app.models.question import Question, QuestionOption, question_tags
+from app.models.tag import Tag
 from app.models.topic import Topic
 from app.models.user import User
 from app.schemas.question import (
@@ -22,6 +24,9 @@ from app.schemas.question import (
     GenerateQuestionsResponse,
     QuestionResponse,
     TagResponse,
+    TagUpdateRequest,
+    QuestionOptionUpdateRequest,
+    QuestionUpdateRequest,
 )
 from app.services import question_bank
 
@@ -214,3 +219,163 @@ def list_tags(
     )
     logger.debug(f"Retrieved {len(tags)} tags for topic {topic_id}")
     return tags
+
+
+@router.put("/{question_id}", response_model=QuestionResponse)
+def update_question(
+    question_id: UUID,
+    payload: QuestionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update a question, its options, and tags.
+    """
+    question = db.query(Question).filter(
+        Question.id == question_id,
+        Question.user_id == current_user.id
+    ).first()
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found.")
+
+    question.question_text = payload.question_text
+    question.explanation = payload.explanation
+    question.difficulty = payload.difficulty
+
+    # Update Options
+    for opt in question.options:
+        db.delete(opt)
+    
+    for idx, opt_in in enumerate(payload.options[:4]):
+        option = QuestionOption(
+            question_id=question.id,
+            option_text=opt_in.option_text,
+            is_correct=opt_in.is_correct,
+            option_order=idx
+        )
+        db.add(option)
+
+    # Update tags association
+    db.execute(
+        question_tags.delete().where(question_tags.c.question_id == question.id)
+    )
+
+    from app.services.question_bank import _resolve_or_create_tag
+    for tag_name in payload.tags:
+        t_name = tag_name.strip().lower()
+        if not t_name:
+            continue
+        tag = _resolve_or_create_tag(t_name, question.topic_id, current_user.id, db)
+        
+        exists = db.execute(
+            text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
+            {"qid": question.id, "tid": tag.id},
+        ).first()
+        if not exists:
+            db.execute(question_tags.insert().values(question_id=question.id, tag_id=tag.id))
+
+    db.commit()
+    db.refresh(question)
+    
+    return QuestionResponse.from_orm_with_tags(question)
+
+
+@router.delete("/{question_id}", status_code=status.HTTP_200_OK)
+def delete_question(
+    question_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Physically delete a question from the database.
+    """
+    question = db.query(Question).filter(
+        Question.id == question_id,
+        Question.user_id == current_user.id
+    ).first()
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found.")
+
+    db.delete(question)
+    db.commit()
+    logger.info(f"User {current_user.email} deleted question {question_id}")
+    return {"message": "Question deleted successfully."}
+
+
+@router.put("/tags/{tag_id}", response_model=TagResponse)
+def update_tag(
+    tag_id: UUID,
+    payload: TagUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Rename a tag across all questions inside a topic. Handles merges if target tag already exists.
+    """
+    tag = db.query(Tag).filter(
+        Tag.id == tag_id,
+        Tag.user_id == current_user.id
+    ).first()
+    if not tag:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found.")
+
+    new_name = payload.name.strip().lower()
+    if not new_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tag name cannot be empty.")
+
+    existing_tag = db.query(Tag).filter(
+        Tag.user_id == current_user.id,
+        Tag.topic_id == tag.topic_id,
+        Tag.name == new_name,
+        Tag.id != tag_id
+    ).first()
+
+    if existing_tag:
+        links = db.execute(
+            text("SELECT question_id FROM question_tags WHERE tag_id = :tid"),
+            {"tid": tag.id}
+        ).all()
+        
+        for link in links:
+            qid = link[0]
+            already_linked = db.execute(
+                text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
+                {"qid": qid, "tid": existing_tag.id}
+            ).first()
+            if not already_linked:
+                db.execute(
+                    question_tags.insert().values(question_id=qid, tag_id=existing_tag.id)
+                )
+        
+        db.delete(tag)
+        db.commit()
+        logger.info(f"User {current_user.email} merged tag {tag_id} into existing tag {existing_tag.id} ('{new_name}')")
+        return existing_tag
+
+    tag.name = new_name
+    db.commit()
+    db.refresh(tag)
+    logger.info(f"User {current_user.email} renamed tag {tag_id} to '{new_name}'")
+    return tag
+
+
+@router.delete("/tags/{tag_id}", status_code=status.HTTP_200_OK)
+def delete_tag(
+    tag_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete a tag from the database.
+    """
+    tag = db.query(Tag).filter(
+        Tag.id == tag_id,
+        Tag.user_id == current_user.id
+    ).first()
+    if not tag:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found.")
+
+    db.delete(tag)
+    db.commit()
+    logger.info(f"User {current_user.email} deleted tag {tag_id} and removed it from all questions.")
+    return {"message": "Tag deleted successfully."}

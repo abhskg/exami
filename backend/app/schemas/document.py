@@ -16,3 +16,23 @@ class DocumentResponse(BaseModel):
     ingested_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentUpdateRequest(BaseModel):
+    original_filename: str
+
+
+class ContentChunkResponse(BaseModel):
+    id: UUID
+    document_id: UUID
+    user_id: UUID
+    topic_id: UUID
+    chunk_text: str
+    chunk_index: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChunkUpdateRequest(BaseModel):
+    chunk_text: str
+

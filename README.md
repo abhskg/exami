@@ -96,6 +96,11 @@ You can quickly configure, setup, and run the project using our new developer su
 | **Run Dev Servers**    | `make dev`             | `.\run.ps1 dev`               |
 | **Run Backend Tests**  | `make backend-test`    | `.\run.ps1 backend-test`      |
 | **Clean Build Caches** | `make clean`           | `.\run.ps1 clean`             |
+| **Purge Documents**    | `make purge-documents` | —                             |
+| **Purge Questions**    | `make purge-questions` | —                             |
+| **Purge Tags**         | `make purge-tags`      | —                             |
+| **Purge Topics**       | `make purge-topics`    | —                             |
+| **Purge All Data**     | `make purge-all`       | —                             |
 
 ---
 

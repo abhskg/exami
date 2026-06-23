@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
+import { KnowledgeCatalog } from './components/KnowledgeCatalog';
 
 interface Topic {
   id: string;
@@ -47,7 +48,7 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results'>(
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results' | 'manage'>(
     'dashboard'
   );
   const [dbConnected, setDbConnected] = useState<boolean>(false);
@@ -1017,6 +1018,27 @@ function App() {
             >
               <TrendingUp size={18} />
               <span>Results & Review</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('manage')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                width: '100%',
+                padding: '12px 16px',
+                border: 'none',
+                background: activeTab === 'manage' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                color: activeTab === 'manage' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontWeight: activeTab === 'manage' ? 600 : 400,
+                transition: 'var(--transition-fast)',
+              }}
+            >
+              <Database size={18} />
+              <span>Knowledge Catalog</span>
             </button>
           </nav>
 
@@ -3820,6 +3842,22 @@ function App() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Knowledge Catalog Management Screen */}
+        {activeTab === 'manage' && (
+          <KnowledgeCatalog
+            apiUrl={apiUrl}
+            token={token}
+            selectedTopic={selectedTopic}
+            showToast={showToast}
+            onDocumentsChange={() => {
+              if (selectedTopic) {
+                fetchDocuments(selectedTopic.id);
+                fetchTags(selectedTopic.id);
+              }
+            }}
+          />
         )}
       </main>
     </div>

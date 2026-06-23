@@ -91,3 +91,23 @@ class TagResponse(BaseModel):
 class GenerateQuestionsResponse(BaseModel):
     generated: int
     questions: list[QuestionResponse]
+
+
+class TagUpdateRequest(BaseModel):
+    name: str
+
+
+class QuestionOptionUpdateRequest(BaseModel):
+    id: Optional[UUID] = None
+    option_text: str
+    is_correct: bool
+    option_order: int
+
+
+class QuestionUpdateRequest(BaseModel):
+    question_text: str
+    explanation: Optional[str] = None
+    difficulty: str
+    tags: list[str]
+    options: list[QuestionOptionUpdateRequest]
+

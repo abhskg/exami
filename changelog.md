@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Knowledge Catalog Dashboard**: Integrated a new sidebar tab and [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx) client sub-view for comprehensive catalog administration (Documents, Embeddings/Chunks, Questions, and Tags).
+- **Document & Chunk CRUD APIs**: Implemented `PUT /api/documents/{id}` (rename), `DELETE /api/documents/{id}` (file and database cascade deletion), `GET /api/documents/{id}/chunks`, `PUT /api/documents/chunks/{id}` (updates chunk text and regenerates embedding vector), and `DELETE /api/documents/chunks/{id}`.
+- **Question & Tag CRUD APIs**: Implemented `PUT /api/questions/{id}` (full MCQ editor including options and tags), `DELETE /api/questions/{id}`, `PUT /api/questions/tags/{id}` (renames tag with duplicate merging support), and `DELETE /api/questions/tags/{id}`.
+- **Bulk Purge Utilities**: Created a transaction-safe database cleaning script [purge.py](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/backend/app/purge.py) and exposed `make purge-documents`, `make purge-questions`, `make purge-tags`, `make purge-topics`, and `make purge-all` targets in the root [Makefile](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/Makefile).
+- **CRUD Integration Tests**: Added a new test suite [test_management.py](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/backend/app/tests/test_management.py) verifying all document, chunk, question, and tag CRUD features.
 - **Centralized Logging Setup**: Added a centralized, structured logging setup using `logging.config.dictConfig` in `backend/app/core/logging_config.py`. Standardized console formats and silenced verbose logs from external packages (`sqlalchemy.engine`, `uvicorn.access`, etc.).
 - **LOG_LEVEL Configuration**: Added a new configuration parameter `LOG_LEVEL` (default: "INFO") in settings (`app/core/config.py` and `.env` / `.env.example`).
 - **HTTP Request Logging Middleware**: Implemented an ASGI middleware in `app/main.py` that intercepts all incoming requests to log method, path, query arguments, client host, duration, and status code.

@@ -1,6 +1,6 @@
 # Makefile for AI-Powered Exam Preparation Portal
 
-.PHONY: help db-up db-down db-logs backend-setup backend-db-init backend-dev backend-test frontend-setup frontend-dev frontend-build setup-all dev clean format backend-format frontend-format
+.PHONY: help db-up db-down db-logs backend-setup backend-db-init backend-dev backend-test frontend-setup frontend-dev frontend-build setup-all dev clean format backend-format frontend-format purge-documents purge-questions purge-tags purge-topics purge-all
 
 # Default shell
 SHELL := /bin/sh
@@ -99,6 +99,23 @@ frontend-format:
 	cd frontend && npm run format
 
 format: backend-format frontend-format
+
+# Purge commands
+purge-documents:
+	cd backend && $(PYTHON) -m app.purge --documents
+
+purge-questions:
+	cd backend && $(PYTHON) -m app.purge --questions
+
+purge-tags:
+	cd backend && $(PYTHON) -m app.purge --tags
+
+purge-topics:
+	cd backend && $(PYTHON) -m app.purge --topics
+
+purge-all:
+	cd backend && $(PYTHON) -m app.purge --all
+
 
 clean:
 	@echo "Cleaning caches and temporary files..."

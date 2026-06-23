@@ -20,11 +20,18 @@ from app.api.auth_dependencies import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.document import Document
+from app.models.content_chunk import ContentChunk
 from app.models.job import Job
 from app.models.topic import Topic
 from app.models.user import User
-from app.schemas.document import DocumentResponse
+from app.schemas.document import (
+    DocumentResponse,
+    DocumentUpdateRequest,
+    ContentChunkResponse,
+    ChunkUpdateRequest,
+)
 from app.workers.ingestion import process_document_task
+from app.services.llm_service import embed_text
 
 logger = logging.getLogger(__name__)
 
@@ -368,3 +375,141 @@ Simulated Parser Agent Run:
         "document": doc_record,
         "job_id": job_record.id,
     }
+
+
+@router.put("/{document_id}", response_model=DocumentResponse)
+def update_document(
+    document_id: UUID,
+    payload: DocumentUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Rename a document.
+    """
+    doc = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+    
+    doc.original_filename = payload.original_filename
+    db.commit()
+    db.refresh(doc)
+    logger.info(f"User {current_user.email} renamed document {document_id} to '{payload.original_filename}'")
+    return doc
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_200_OK)
+def delete_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete a document from DB (cascades to chunks) and delete physical file.
+    """
+    doc = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+    
+    # Try deleting the physical file
+    if doc.storage_path and os.path.exists(doc.storage_path):
+        try:
+            os.remove(doc.storage_path)
+            logger.info(f"Deleted physical file: {doc.storage_path}")
+        except Exception as e:
+            logger.error(f"Failed to delete physical file {doc.storage_path}: {e}")
+            
+    db.delete(doc)
+    db.commit()
+    logger.info(f"User {current_user.email} deleted document {document_id} and all related chunks.")
+    return {"message": "Document deleted successfully."}
+
+
+@router.get("/{document_id}/chunks", response_model=list[ContentChunkResponse])
+def list_document_chunks(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List content chunks for a specific document.
+    """
+    # Enforce isolation
+    doc = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+        
+    chunks = db.query(ContentChunk).filter(
+        ContentChunk.document_id == document_id,
+        ContentChunk.user_id == current_user.id
+    ).order_by(ContentChunk.chunk_index.asc()).all()
+    
+    return chunks
+
+
+@router.put("/chunks/{chunk_id}", response_model=ContentChunkResponse)
+def update_chunk(
+    chunk_id: UUID,
+    payload: ChunkUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update content chunk text and re-generate pgvector embedding.
+    """
+    chunk = db.query(ContentChunk).filter(
+        ContentChunk.id == chunk_id,
+        ContentChunk.user_id == current_user.id
+    ).first()
+    if not chunk:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found.")
+        
+    chunk.chunk_text = payload.chunk_text
+    
+    # Regenerate embedding
+    try:
+        embeddings = embed_text([payload.chunk_text])
+        if embeddings and len(embeddings) > 0:
+            chunk.embedding = embeddings[0]
+            logger.info(f"Regenerated vector embedding for chunk {chunk_id}")
+    except Exception as e:
+        logger.error(f"Error regenerating embedding during chunk update: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to regenerate embedding: {str(e)}"
+        )
+        
+    db.commit()
+    db.refresh(chunk)
+    return chunk
+
+
+@router.delete("/chunks/{chunk_id}", status_code=status.HTTP_200_OK)
+def delete_chunk(
+    chunk_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete a single content chunk.
+    """
+    chunk = db.query(ContentChunk).filter(
+        ContentChunk.id == chunk_id,
+        ContentChunk.user_id == current_user.id
+    ).first()
+    if not chunk:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found.")
+        
+    db.delete(chunk)
+    db.commit()
+    logger.info(f"User {current_user.email} deleted chunk {chunk_id}")
+    return {"message": "Chunk deleted successfully."}
