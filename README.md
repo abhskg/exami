@@ -15,10 +15,10 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 - **🔒 Complete Workspace Isolation**: User data is isolated at the API and database levels by `user_id` to guarantee secure workspaces.
 - **📚 Fluid Knowledge Growth**: Ingest documents using three methods (File Upload, Raw Text Paste, and Web Search Agent simulation) to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
 - **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `gemini-embedding-001`), and store them using `pgvector`.
-- **📝 Dynamic Structured Question Bank**: Automatically generate a customizable number of structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-2.0-flash`).
+- **📝 Dynamic Structured Question Bank**: Automatically generate a customizable number of structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-3.1-flash-lite`).
 
 - **⏱️ Dual Exam Simulator Modes**:
-    - _Practice Mode_: Provides instant explanations and correction feedback as you complete each question.
+    - _Practice Mode_: Provides **detailed, elaborated explanations** after each answer — covering why the correct answer is right, why each distractor is wrong (with misconception analysis), a real-world example or analogy, and any relevant formula or rule. Explanations are rendered as a rich colour-coded card (teal for correct, red for incorrect) with per-sentence visual hierarchy.
     - _Timed Mode_: Simulates standard test environments. Enforces hard countdown limits, locks answers, and hides explanation analytics until the exam is fully completed.
 - **📊 Performance Heatmaps**: Deep insights mapped onto a customizable concept-tag hierarchy. Visualize weak points, score distribution, and overall preparation status.
 - **🛡️ Centralized Logging & Error Resilience**: Structured console logger format matching `LOG_LEVEL` environment parameters. Centralized request intercepting middleware logs request parameters (method, path, client IP, status, duration) and catches all unhandled routing exceptions to log stack-traces and output clean 500 JSON responses.
@@ -180,7 +180,7 @@ The following variables in `backend/.env` control the active providers and limit
 | Variable             | Description                       | Allowed Values / Examples                                   |
 | :------------------- | :-------------------------------- | :---------------------------------------------------------- |
 | `LLM_PROVIDER`       | Provider for MCQ generation       | `gemini` (default), `openai`, `lmstudio`                    |
-| `LLM_MODEL`          | Specific model for MCQ generation | `gemini-2.0-flash`, `gpt-4o-mini`, custom local model       |
+| `LLM_MODEL`          | Specific model for MCQ generation | `gemini-3.1-flash-lite`, `gpt-4o-mini`, custom local model       |
 | `EMBEDDING_PROVIDER` | Provider for text embeddings      | `gemini` (default), `openai`, `lmstudio`, `mock`            |
 | `EMBEDDING_MODEL`    | Model used for vector embeddings  | `gemini-embedding-001` (default), `text-embedding-3-small`, local model |
 | `MAX_FILE_SIZE_MB`   | Maximum allowed file upload size  | Integer value in MB (default: `15`)                         |
@@ -191,7 +191,7 @@ The following variables in `backend/.env` control the active providers and limit
 
 ```env
 LLM_PROVIDER=gemini
-LLM_MODEL=gemini-2.0-flash
+LLM_MODEL=gemini-3.1-flash-lite
 GEMINI_API_KEY="your-gemini-api-key"
 
 EMBEDDING_PROVIDER=gemini

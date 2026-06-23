@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # LLM Provider Configuration
     LLM_PROVIDER: str = "gemini"
-    LLM_MODEL: str = "gemini-2.0-flash"
+    LLM_MODEL: str = "gemini-3.1-flash-lite"
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     LMSTUDIO_BASE_URL: str = "http://localhost:1234/v1"

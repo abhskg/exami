@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Elaborate Practice Mode Explanations**: Enhanced the MCQ generation LLM prompt (`backend/app/services/question_bank.py`) to produce comprehensive, multi-sentence explanations (minimum 4–6 sentences per question). Each explanation now covers: (1) why the correct answer is right with material references, (2) why each distractor is wrong addressing common misconceptions, (3) a real-world example or analogy for deeper understanding, and (4) any relevant formula, definition, or rule. The practice mode explanation panel in `frontend/src/App.tsx` was redesigned as a rich card with a colour-coded header (teal for correct, red for incorrect), a ✓/✗ badge, and explanation text split into sentence-level paragraphs with left-border accents for visual hierarchy.
 - **Configurable Ingestion File Size Limit**: Extracted the hardcoded 15MB file size limit to environment variables (`MAX_FILE_SIZE_MB` in backend and `VITE_MAX_FILE_SIZE_MB` in frontend). The frontend dynamically syncs this value from the backend's `/health` endpoint while defaulting to the environment configuration.
 - **Customizable Question Generation Count**: Introduced a dynamic question generation count selector (slider widget) in the frontend. Users can now choose to generate anywhere between 1 and 30 questions at once, replacing the previous hardcoded limit of 10.
 - **Knowledge Catalog Dashboard**: Integrated a new sidebar tab and [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx) client sub-view for comprehensive catalog administration (Documents, Embeddings/Chunks, Questions, and Tags).
 
 ### Fixed
+- **React `key` Prop Warning in Explanation Panel**: Replaced bare array-index `key={idx}` with a content-based key (`\`${idx}-${sentence.slice(0, 30)}\``) in the practice-mode explanation sentence map, resolving the ESLint/React index-as-key warning.
+- **Outdated Gemini Model Config**: Updated default LLM model from the deprecated `gemini-2.0-flash` to the currently active, cost-efficient, and supported `gemini-3.1-flash-lite` to resolve 404 NOT_FOUND API errors during MCQ question generation.
 - **Gemini Embedding Generation**: Resolved a 404 NOT_FOUND error during text embedding generation by changing the default embedding model from `text-embedding-004` to `gemini-embedding-001`. Configured the API call to pass `output_dimensionality` corresponding to settings `EMBEDDING_DIMENSION` (768).
+
+
 
 
 - **Document & Chunk CRUD APIs**: Implemented `PUT /api/documents/{id}` (rename), `DELETE /api/documents/{id}` (file and database cascade deletion), `GET /api/documents/{id}/chunks`, `PUT /api/documents/chunks/{id}` (updates chunk text and regenerates embedding vector), and `DELETE /api/documents/chunks/{id}`.

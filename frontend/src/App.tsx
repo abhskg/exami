@@ -2988,45 +2988,117 @@ function App() {
 
                   {/* Immediate Explanation (Practice Mode only, after answering) */}
                   {examMode === 'practice' &&
-                    practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (
-                      <div
-                        className="fade-in"
-                        style={{
-                          padding: '16px 20px',
-                          background: 'rgba(99,102,241,0.06)',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(99,102,241,0.15)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                        }}
-                      >
+                    practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (() => {
+                      const feedback = practiceFeedback[sessionQuestions[currentQuestionIndex].id];
+                      const isCorrect = feedback?.isCorrect;
+                      const explanation = sessionQuestions[currentQuestionIndex].explanation || '';
+                      // Split explanation into paragraphs on '. ' boundaries for readability
+                      const sentences = explanation
+                        ? explanation.split(/(?<=\.) (?=[A-Z])/).filter(Boolean)
+                        : [];
+
+                      return (
                         <div
+                          className="fade-in"
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            color: 'var(--accent-primary)',
-                            fontWeight: 600,
-                            fontSize: '0.9rem',
+                            borderRadius: '12px',
+                            border: isCorrect
+                              ? '1px solid rgba(20,184,166,0.3)'
+                              : '1px solid rgba(239,68,68,0.3)',
+                            background: isCorrect
+                              ? 'linear-gradient(135deg, rgba(20,184,166,0.07) 0%, rgba(99,102,241,0.05) 100%)'
+                              : 'linear-gradient(135deg, rgba(239,68,68,0.07) 0%, rgba(99,102,241,0.05) 100%)',
+                            overflow: 'hidden',
                           }}
                         >
-                          <Sparkles size={16} />
-                          <span>Practice Mode Explanation</span>
+                          {/* Header bar */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 20px',
+                              borderBottom: isCorrect
+                                ? '1px solid rgba(20,184,166,0.2)'
+                                : '1px solid rgba(239,68,68,0.2)',
+                              background: isCorrect
+                                ? 'rgba(20,184,166,0.08)'
+                                : 'rgba(239,68,68,0.08)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Sparkles size={15} color={isCorrect ? 'var(--accent-teal)' : '#ef4444'} />
+                              <span style={{
+                                fontWeight: 700,
+                                fontSize: '0.88rem',
+                                color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
+                                letterSpacing: '0.02em',
+                              }}>
+                                Explanation
+                              </span>
+                            </div>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.08em',
+                              padding: '3px 10px',
+                              borderRadius: '20px',
+                              background: isCorrect
+                                ? 'rgba(20,184,166,0.15)'
+                                : 'rgba(239,68,68,0.15)',
+                              color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
+                            }}>
+                              {isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                            </span>
+                          </div>
+
+                          {/* Body */}
+                          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {explanation ? (
+                              sentences.length > 1 ? (
+                                sentences.map((sentence, idx) => (
+                                  <p key={`${idx}-${sentence.slice(0, 30)}`} style={{
+                                    margin: 0,
+                                    fontSize: '0.875rem',
+                                    color: idx === 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                    fontWeight: idx === 0 ? 500 : 400,
+                                    lineHeight: 1.7,
+                                    paddingLeft: idx === 0 ? 0 : '12px',
+                                    borderLeft: idx === 0
+                                      ? 'none'
+                                      : isCorrect
+                                        ? '2px solid rgba(20,184,166,0.25)'
+                                        : '2px solid rgba(239,68,68,0.25)',
+                                  }}>
+                                    {sentence.trim()}
+                                  </p>
+                                ))
+                              ) : (
+                                <p style={{
+                                  margin: 0,
+                                  fontSize: '0.875rem',
+                                  color: 'var(--text-secondary)',
+                                  lineHeight: 1.7,
+                                }}>
+                                  {explanation}
+                                </p>
+                              )
+                            ) : (
+                              <p style={{
+                                margin: 0,
+                                fontSize: '0.875rem',
+                                color: 'var(--text-muted)',
+                                fontStyle: 'italic',
+                                lineHeight: 1.6,
+                              }}>
+                                No explanation available for this question. Try regenerating questions for richer explanations.
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: '0.88rem',
-                            color: 'var(--text-secondary)',
-                            lineHeight: 1.6,
-                          }}
-                        >
-                          {sessionQuestions[currentQuestionIndex].explanation ||
-                            'No explanation provided for this question.'}
-                        </p>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                   {/* Action Buttons */}
                   <div

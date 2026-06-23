@@ -90,7 +90,7 @@ def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
         try:
             if provider == "gemini":
                 client = genai.Client(api_key=settings.GEMINI_API_KEY)
-                model_name = settings.LLM_MODEL or "gemini-2.0-flash"
+                model_name = settings.LLM_MODEL or "gemini-3.1-flash-lite"
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,

@@ -185,7 +185,7 @@ def generate_questions(
         "mixed": "Mix easy, medium, and hard difficulty levels across questions.",
     }.get(difficulty, "Make questions moderately challenging.")
 
-    prompt = f"""You are an expert exam question generator. Generate exactly {count} high-quality multiple-choice questions (MCQs) based on the study material provided below.
+    prompt = f"""You are an expert exam question generator and educator. Generate exactly {count} high-quality multiple-choice questions (MCQs) based on the study material provided below.
 
 CONTEXT (study material excerpts):
 {context_blocks}
@@ -196,7 +196,12 @@ REQUIREMENTS:
 - Exactly one option must be correct (is_correct: true).
 - {difficulty_instruction}
 - {tag_hint}
-- Provide a clear, concise explanation of why the correct answer is right.
+- For the "explanation" field, write a DETAILED and ELABORATE explanation (minimum 4–6 sentences) that:
+    1. Clearly states WHY the correct answer is right, referencing specific concepts from the study material.
+    2. Explains WHY each of the incorrect options (distractors) is wrong — pointing out the common misconception each distractor targets.
+    3. Provides a concrete real-world example, analogy, or reference to reinforce understanding.
+    4. Mentions any relevant formula, definition, or rule that applies.
+    The explanation must be educational and thorough — a student reading it should gain a deep understanding of the topic, not just know which answer to pick.
 - Suggest 1–3 relevant topic tags (short lowercase strings, e.g. "recursion", "sorting").
 
 OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
@@ -209,7 +214,7 @@ OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
       {{"text": "...", "is_correct": false}},
       {{"text": "...", "is_correct": false}}
     ],
-    "explanation": "...",
+    "explanation": "A detailed multi-sentence explanation covering why the correct answer is right, why each wrong option is incorrect (addressing common misconceptions), and a real-world example or analogy to solidify understanding.",
     "tags": ["tag1", "tag2"],
     "difficulty": "{difficulty if difficulty != 'mixed' else 'medium'}"
   }}
