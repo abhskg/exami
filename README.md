@@ -13,6 +13,7 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 ## 📸 Main Features
 
 - **🔒 Complete Workspace Isolation**: User data is isolated at the API and database levels by `user_id` to guarantee secure workspaces.
+- **🗂️ Full Topic Management**: Create, rename, and delete study topics directly from the sidebar. Deleting a topic cascades to remove all its documents, embeddings, questions, exam sessions, and tags in a single atomic operation. Rename uses an inline editor; delete triggers a confirmation modal to prevent accidental data loss.
 - **📚 Fluid Knowledge Growth**: Ingest documents using three methods (File Upload, Raw Text Paste, and Web Search Agent simulation) to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
 - **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `gemini-embedding-001`), and store them using `pgvector`.
 - **📝 Dynamic Structured Question Bank**: Automatically generate a customizable number of structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-3.1-flash-lite`).
@@ -24,6 +25,7 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 - **🛡️ Centralized Logging & Error Resilience**: Structured console logger format matching `LOG_LEVEL` environment parameters. Centralized request intercepting middleware logs request parameters (method, path, client IP, status, duration) and catches all unhandled routing exceptions to log stack-traces and output clean 500 JSON responses.
 
 ---
+
 
 ## 🛠️ Technology Stack
 

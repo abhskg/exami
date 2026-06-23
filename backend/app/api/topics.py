@@ -7,7 +7,7 @@ from app.api.auth_dependencies import get_current_user
 from app.core.database import get_db
 from app.models.topic import Topic
 from app.models.user import User
-from app.schemas.topic import TopicCreate, TopicResponse
+from app.schemas.topic import TopicCreate, TopicResponse, TopicUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -68,3 +68,74 @@ def create_topic(
         f"Topic '{topic.name}' (ID: {topic.id}) created successfully for User {current_user.id}."
     )
     return topic
+
+
+@router.put("/{topic_id}", response_model=TopicResponse)
+def update_topic(
+    topic_id: str,
+    topic_in: TopicUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update the name and/or description of an existing topic owned by the authenticated user.
+    """
+    topic = (
+        db.query(Topic)
+        .filter(Topic.id == topic_id, Topic.user_id == current_user.id)
+        .first()
+    )
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found.")
+
+    if topic_in.name is not None:
+        # Check uniqueness (excluding self)
+        conflict = (
+            db.query(Topic)
+            .filter(
+                Topic.user_id == current_user.id,
+                Topic.name == topic_in.name,
+                Topic.id != topic_id,
+            )
+            .first()
+        )
+        if conflict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Topic with name '{topic_in.name}' already exists.",
+            )
+        topic.name = topic_in.name
+
+    if topic_in.description is not None:
+        topic.description = topic_in.description
+
+    db.commit()
+    db.refresh(topic)
+    logger.info(f"Topic '{topic.name}' (ID: {topic.id}) updated by User {current_user.id}.")
+    return topic
+
+
+@router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_topic(
+    topic_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete a topic and all its associated data (documents, questions, sessions, tags)
+    owned by the authenticated user.
+    """
+    topic = (
+        db.query(Topic)
+        .filter(Topic.id == topic_id, Topic.user_id == current_user.id)
+        .first()
+    )
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found.")
+
+    logger.warning(
+        f"User {current_user.id} deleting Topic '{topic.name}' (ID: {topic.id}) and all its data."
+    )
+    db.delete(topic)
+    db.commit()
+

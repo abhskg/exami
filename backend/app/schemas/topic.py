@@ -14,6 +14,11 @@ class TopicCreate(TopicBase):
     pass
 
 
+class TopicUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class TopicResponse(TopicBase):
     id: UUID
     user_id: UUID

@@ -210,3 +210,28 @@ textarea:focus {
 .fade-in {
   animation: fadeIn var(--transition-normal) forwards;
 }
+
+/* Sidebar Topic Rows — reveal edit/delete actions on hover */
+.topic-row .topic-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.topic-row:hover .topic-actions {
+  opacity: 1;
+}
+
+.topic-row .topic-actions button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-primary) !important;
+}
+
+.topic-row .topic-actions button:last-child:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+}
+

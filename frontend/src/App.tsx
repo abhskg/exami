@@ -18,6 +18,9 @@ import {
   BookOpen,
   Tag,
   X,
+  Pencil,
+  Trash2,
+  Check,
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
 import { KnowledgeCatalog } from './components/KnowledgeCatalog';
@@ -71,6 +74,13 @@ function App() {
   // Create Topic Form state
   const [newTopicName, setNewTopicName] = useState<string>('');
   const [isCreatingTopic, setIsCreatingTopic] = useState<boolean>(false);
+
+  // Edit / Delete Topic state
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingTopicName, setEditingTopicName] = useState<string>('');
+  const [isRenamingTopic, setIsRenamingTopic] = useState<boolean>(false);
+  const [confirmDeleteTopic, setConfirmDeleteTopic] = useState<Topic | null>(null);
+  const [isDeletingTopic, setIsDeletingTopic] = useState<boolean>(false);
 
   // Upload & Jobs state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -259,6 +269,64 @@ function App() {
       showToast('Network error creating topic.', 'error');
     } finally {
       setIsCreatingTopic(false);
+    }
+  };
+
+  // 4b. Rename an existing topic
+  const handleRenameTopic = async (topicId: string) => {
+    const newName = editingTopicName.trim();
+    if (!newName || !token) return;
+    setIsRenamingTopic(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/topics/${topicId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newName }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Topic renamed to "${newName}"!`, 'success');
+        setEditingTopicId(null);
+        await fetchTopics();
+        if (selectedTopic?.id === topicId) setSelectedTopic(data);
+      } else {
+        showToast(data.detail || 'Failed to rename topic.', 'error');
+      }
+    } catch (err) {
+      console.error('Error renaming topic:', err);
+      showToast('Network error renaming topic.', 'error');
+    } finally {
+      setIsRenamingTopic(false);
+    }
+  };
+
+  // 4c. Delete a topic (after confirmation)
+  const handleDeleteTopic = async (topicId: string) => {
+    if (!token) return;
+    setIsDeletingTopic(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/topics/${topicId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok || res.status === 204) {
+        showToast('Topic and all its data deleted.', 'success');
+        setConfirmDeleteTopic(null);
+        // If the deleted topic was selected, clear selection
+        if (selectedTopic?.id === topicId) setSelectedTopic(null);
+        await fetchTopics(selectedTopic?.id !== topicId);
+      } else {
+        const data = await res.json();
+        showToast(data.detail || 'Failed to delete topic.', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting topic:', err);
+      showToast('Network error deleting topic.', 'error');
+    } finally {
+      setIsDeletingTopic(false);
     }
   };
 
@@ -876,7 +944,92 @@ function App() {
         </div>
       )}
 
+      {/* ---- Delete Topic Confirmation Modal ---- */}
+      {confirmDeleteTopic && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2000,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => !isDeletingTopic && setConfirmDeleteTopic(null)}
+        >
+          <div
+            className="glass-card"
+            style={{
+              padding: '32px',
+              borderRadius: '16px',
+              maxWidth: '420px',
+              width: '90%',
+              background: 'var(--bg-secondary)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                background: 'rgba(239,68,68,0.15)',
+                borderRadius: '10px',
+                padding: '10px',
+                display: 'flex',
+              }}>
+                <Trash2 size={22} color="#ef4444" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.05rem' }}>
+                  Delete Topic?
+                </h3>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.6 }}>
+              Deleting <strong style={{ color: 'var(--text-primary)' }}>"{confirmDeleteTopic.name}"</strong> will
+              permanently remove all its documents, embeddings, generated questions, exam sessions, and tags.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                disabled={isDeletingTopic}
+                onClick={() => setConfirmDeleteTopic(null)}
+                style={{ padding: '8px 20px', borderRadius: '8px', fontSize: '0.9rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isDeletingTopic}
+                onClick={() => handleDeleteTopic(confirmDeleteTopic.id)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: isDeletingTopic ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                }}
+              >
+                {isDeletingTopic ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Delete Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
+
       <aside
         style={{
           width: '280px',
@@ -1094,12 +1247,12 @@ function App() {
                 topics.map(t => (
                   <div
                     key={t.id}
-                    onClick={() => setSelectedTopic(t)}
+                    className="topic-row"
                     style={{
-                      padding: '8px 12px',
+                      padding: editingTopicId === t.id ? '4px 8px' : '8px 12px',
                       borderRadius: '6px',
                       fontSize: '0.9rem',
-                      cursor: 'pointer',
+                      cursor: editingTopicId === t.id ? 'default' : 'pointer',
                       background:
                         selectedTopic?.id === t.id ? 'rgba(255,255,255,0.03)' : 'transparent',
                       borderLeft:
@@ -1110,13 +1263,124 @@ function App() {
                         selectedTopic?.id === t.id
                           ? 'var(--text-primary)'
                           : 'var(--text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
                       transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      position: 'relative',
+                    }}
+                    onClick={() => {
+                      if (editingTopicId !== t.id) setSelectedTopic(t);
                     }}
                   >
-                    {t.name}
+                    {editingTopicId === t.id ? (
+                      /* ---- Inline rename mode ---- */
+                      <>
+                        <input
+                          autoFocus
+                          value={editingTopicName}
+                          onChange={e => setEditingTopicName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleRenameTopic(t.id);
+                            if (e.key === 'Escape') setEditingTopicId(null);
+                          }}
+                          onClick={e => e.stopPropagation()}
+                          style={{
+                            flex: 1,
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid var(--accent-primary)',
+                            borderRadius: '4px',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            padding: '4px 6px',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          title="Save"
+                          disabled={isRenamingTopic}
+                          onClick={e => { e.stopPropagation(); handleRenameTopic(t.id); }}
+                          style={{
+                            background: 'var(--accent-teal)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            padding: '3px 5px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          {isRenamingTopic ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        </button>
+                        <button
+                          title="Cancel"
+                          onClick={e => { e.stopPropagation(); setEditingTopicId(null); }}
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: 'none',
+                            borderRadius: '4px',
+                            color: 'var(--text-muted)',
+                            padding: '3px 5px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </>
+                    ) : (
+                      /* ---- Normal display mode ---- */
+                      <>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.name}
+                        </span>
+                        <span className="topic-actions">
+                          <button
+                            title="Rename topic"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setEditingTopicId(t.id);
+                              setEditingTopicName(t.name);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '2px 3px',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              lineHeight: 1,
+                            }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            title="Delete topic"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setConfirmDeleteTopic(t);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '2px 3px',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              lineHeight: 1,
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </span>
+                      </>
+                    )}
                   </div>
                 ))
               )}
