@@ -111,3 +111,24 @@ class QuestionUpdateRequest(BaseModel):
     tags: list[str]
     options: list[QuestionOptionUpdateRequest]
 
+
+# ---------------------------------------------------------------------------
+# Analytics schemas
+# ---------------------------------------------------------------------------
+
+
+class TagAnalytics(BaseModel):
+    tag_name: str
+    question_count: int
+
+
+class TopicAnalytics(BaseModel):
+    topic_name: str
+    question_count: int
+
+
+class QuestionAnalyticsResponse(BaseModel):
+    total_questions: int
+    difficulty_breakdown: dict[str, int]
+    tag_breakdown: list[TagAnalytics]
+    topic_breakdown: list[TopicAnalytics]

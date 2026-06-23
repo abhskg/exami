@@ -390,3 +390,35 @@ class TestQuestionsAPI:
         for tag in body:
             assert "id" in tag
             assert "name" in tag
+
+    def test_analytics_endpoint(self, client, auth_headers, test_topic):
+        """GET /api/questions/analytics should return a QuestionAnalyticsResponse."""
+        # 1. Query with specific topic_id
+        resp = client.get(
+            f"/api/questions/analytics?topic_id={test_topic.id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert "total_questions" in body
+        assert "difficulty_breakdown" in body
+        assert "tag_breakdown" in body
+        assert "topic_breakdown" in body
+
+        # Verify default difficulty breakdown has easy, medium, hard keys
+        diff = body["difficulty_breakdown"]
+        assert "easy" in diff
+        assert "medium" in diff
+        assert "hard" in diff
+
+        # 2. Query without topic_id (global stats)
+        resp_global = client.get(
+            "/api/questions/analytics",
+            headers=auth_headers,
+        )
+        assert resp_global.status_code == 200
+        body_global = resp_global.json()
+        assert "total_questions" in body_global
+        assert "difficulty_breakdown" in body_global
+        assert "tag_breakdown" in body_global
+        assert "topic_breakdown" in body_global

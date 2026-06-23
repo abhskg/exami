@@ -3,13 +3,12 @@ import os
 import pytest
 from fastapi import status
 
+from app.core.config import settings
 from app.models.content_chunk import ContentChunk
 from app.models.document import Document
 from app.models.job import Job
 from app.models.topic import Topic
 from app.workers.ingestion import process_document_task
-from app.core.config import settings
-
 
 
 def get_auth_headers(client):

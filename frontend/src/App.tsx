@@ -90,7 +90,6 @@ function App() {
   const [jobMessage, setJobMessage] = useState<string>('');
   const [generateQuestionsCount, setGenerateQuestionsCount] = useState<number>(10);
 
-
   // Ingestion Method & new forms state
   const [ingestionMethod, setIngestionMethod] = useState<'upload' | 'raw_text' | 'web_search'>(
     'upload'
@@ -972,13 +971,17 @@ function App() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{
-                background: 'rgba(239,68,68,0.15)',
-                borderRadius: '10px',
-                padding: '10px',
-                display: 'flex',
-              }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}
+            >
+              <div
+                style={{
+                  background: 'rgba(239,68,68,0.15)',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  display: 'flex',
+                }}
+              >
                 <Trash2 size={22} color="#ef4444" />
               </div>
               <div>
@@ -990,9 +993,18 @@ function App() {
                 </p>
               </div>
             </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: 1.6 }}>
-              Deleting <strong style={{ color: 'var(--text-primary)' }}>"{confirmDeleteTopic.name}"</strong> will
-              permanently remove all its documents, embeddings, generated questions, exam sessions, and tags.
+            <p
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+                marginBottom: '24px',
+                lineHeight: 1.6,
+              }}
+            >
+              Deleting{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>"{confirmDeleteTopic.name}"</strong>{' '}
+              will permanently remove all its documents, embeddings, generated questions, exam
+              sessions, and tags.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -1020,7 +1032,11 @@ function App() {
                   fontWeight: 600,
                 }}
               >
-                {isDeletingTopic ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {isDeletingTopic ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
                 Delete Everything
               </button>
             </div>
@@ -1299,7 +1315,10 @@ function App() {
                         <button
                           title="Save"
                           disabled={isRenamingTopic}
-                          onClick={e => { e.stopPropagation(); handleRenameTopic(t.id); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleRenameTopic(t.id);
+                          }}
                           style={{
                             background: 'var(--accent-teal)',
                             border: 'none',
@@ -1311,11 +1330,18 @@ function App() {
                             alignItems: 'center',
                           }}
                         >
-                          {isRenamingTopic ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                          {isRenamingTopic ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Check size={12} />
+                          )}
                         </button>
                         <button
                           title="Cancel"
-                          onClick={e => { e.stopPropagation(); setEditingTopicId(null); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setEditingTopicId(null);
+                          }}
                           style={{
                             background: 'rgba(255,255,255,0.08)',
                             border: 'none',
@@ -1333,7 +1359,14 @@ function App() {
                     ) : (
                       /* ---- Normal display mode ---- */
                       <>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {t.name}
                         </span>
                         <span className="topic-actions">
@@ -2966,10 +2999,33 @@ function App() {
                       </strong>{' '}
                       {availableTags.length}
                     </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Generate count:</span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-secondary)' }}>{generateQuestionsCount} Qs</span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        marginTop: '4px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          Generate count:
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            color: 'var(--accent-secondary)',
+                          }}
+                        >
+                          {generateQuestionsCount} Qs
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -3252,7 +3308,8 @@ function App() {
 
                   {/* Immediate Explanation (Practice Mode only, after answering) */}
                   {examMode === 'practice' &&
-                    practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (() => {
+                    practiceFeedback[sessionQuestions[currentQuestionIndex].id] &&
+                    (() => {
                       const feedback = practiceFeedback[sessionQuestions[currentQuestionIndex].id];
                       const isCorrect = feedback?.isCorrect;
                       const explanation = sessionQuestions[currentQuestionIndex].explanation || '';
@@ -3291,72 +3348,96 @@ function App() {
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Sparkles size={15} color={isCorrect ? 'var(--accent-teal)' : '#ef4444'} />
-                              <span style={{
-                                fontWeight: 700,
-                                fontSize: '0.88rem',
-                                color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
-                                letterSpacing: '0.02em',
-                              }}>
+                              <Sparkles
+                                size={15}
+                                color={isCorrect ? 'var(--accent-teal)' : '#ef4444'}
+                              />
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: '0.88rem',
+                                  color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
                                 Explanation
                               </span>
                             </div>
-                            <span style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.08em',
-                              padding: '3px 10px',
-                              borderRadius: '20px',
-                              background: isCorrect
-                                ? 'rgba(20,184,166,0.15)'
-                                : 'rgba(239,68,68,0.15)',
-                              color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
-                            }}>
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                padding: '3px 10px',
+                                borderRadius: '20px',
+                                background: isCorrect
+                                  ? 'rgba(20,184,166,0.15)'
+                                  : 'rgba(239,68,68,0.15)',
+                                color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
+                              }}
+                            >
                               {isCorrect ? '✓ Correct' : '✗ Incorrect'}
                             </span>
                           </div>
 
                           {/* Body */}
-                          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div
+                            style={{
+                              padding: '16px 20px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px',
+                            }}
+                          >
                             {explanation ? (
                               sentences.length > 1 ? (
                                 sentences.map((sentence, idx) => (
-                                  <p key={`${idx}-${sentence.slice(0, 30)}`} style={{
-                                    margin: 0,
-                                    fontSize: '0.875rem',
-                                    color: idx === 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                    fontWeight: idx === 0 ? 500 : 400,
-                                    lineHeight: 1.7,
-                                    paddingLeft: idx === 0 ? 0 : '12px',
-                                    borderLeft: idx === 0
-                                      ? 'none'
-                                      : isCorrect
-                                        ? '2px solid rgba(20,184,166,0.25)'
-                                        : '2px solid rgba(239,68,68,0.25)',
-                                  }}>
+                                  <p
+                                    key={`${idx}-${sentence.slice(0, 30)}`}
+                                    style={{
+                                      margin: 0,
+                                      fontSize: '0.875rem',
+                                      color:
+                                        idx === 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                      fontWeight: idx === 0 ? 500 : 400,
+                                      lineHeight: 1.7,
+                                      paddingLeft: idx === 0 ? 0 : '12px',
+                                      borderLeft:
+                                        idx === 0
+                                          ? 'none'
+                                          : isCorrect
+                                            ? '2px solid rgba(20,184,166,0.25)'
+                                            : '2px solid rgba(239,68,68,0.25)',
+                                    }}
+                                  >
                                     {sentence.trim()}
                                   </p>
                                 ))
                               ) : (
-                                <p style={{
-                                  margin: 0,
-                                  fontSize: '0.875rem',
-                                  color: 'var(--text-secondary)',
-                                  lineHeight: 1.7,
-                                }}>
+                                <p
+                                  style={{
+                                    margin: 0,
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-secondary)',
+                                    lineHeight: 1.7,
+                                  }}
+                                >
                                   {explanation}
                                 </p>
                               )
                             ) : (
-                              <p style={{
-                                margin: 0,
-                                fontSize: '0.875rem',
-                                color: 'var(--text-muted)',
-                                fontStyle: 'italic',
-                                lineHeight: 1.6,
-                              }}>
-                                No explanation available for this question. Try regenerating questions for richer explanations.
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: '0.875rem',
+                                  color: 'var(--text-muted)',
+                                  fontStyle: 'italic',
+                                  lineHeight: 1.6,
+                                }}
+                              >
+                                No explanation available for this question. Try regenerating
+                                questions for richer explanations.
                               </p>
                             )}
                           </div>

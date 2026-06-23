@@ -12,7 +12,7 @@ import {
   Tag as TagIcon,
   Filter,
   Save,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
 
 interface Topic {
@@ -70,6 +70,23 @@ interface Tag {
   topic_id: string;
 }
 
+interface TagAnalytics {
+  tag_name: string;
+  question_count: number;
+}
+
+interface TopicAnalytics {
+  topic_name: string;
+  question_count: number;
+}
+
+interface QuestionAnalytics {
+  total_questions: number;
+  difficulty_breakdown: { [key: string]: number };
+  tag_breakdown: TagAnalytics[];
+  topic_breakdown: TopicAnalytics[];
+}
+
 interface KnowledgeCatalogProps {
   apiUrl: string;
   token: string | null;
@@ -110,7 +127,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  
+  const [analytics, setAnalytics] = useState<QuestionAnalytics | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+
   // Edit Question Modal / Form State
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [eqText, setEqText] = useState('');
@@ -121,7 +140,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     { text: '', isCorrect: true },
     { text: '', isCorrect: false },
     { text: '', isCorrect: false },
-    { text: '', isCorrect: false }
+    { text: '', isCorrect: false },
   ]);
   const [isSavingQuestion, setIsSavingQuestion] = useState(false);
 
@@ -138,7 +157,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     setIsLoadingDocs(true);
     try {
       const res = await fetch(`${apiUrl}/api/documents/?topic_id=${selectedTopic.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -157,7 +176,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     setIsLoadingChunks(true);
     try {
       const res = await fetch(`${apiUrl}/api/documents/${docId}/chunks`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -170,18 +189,39 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     }
   };
 
+  // Fetch Analytics
+  const fetchAnalytics = async () => {
+    if (!token || !selectedTopic) return;
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/questions/analytics?topic_id=${selectedTopic.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data);
+      }
+    } catch (err) {
+      console.error('Error loading question analytics:', err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
   // Fetch Questions
   const fetchQuestions = async () => {
     if (!token || !selectedTopic) return;
     setIsLoadingQuestions(true);
     try {
       const res = await fetch(`${apiUrl}/api/questions/?topic_id=${selectedTopic.id}&limit=100`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setQuestions(data);
       }
+      // Also fetch analytics to keep dashboard in sync
+      fetchAnalytics();
     } catch (err) {
       console.error('Error loading questions:', err);
     } finally {
@@ -195,7 +235,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     setIsLoadingTags(true);
     try {
       const res = await fetch(`${apiUrl}/api/questions/tags?topic_id=${selectedTopic.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -229,9 +269,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ original_filename: editingDocName.trim() })
+        body: JSON.stringify({ original_filename: editingDocName.trim() }),
       });
       if (res.ok) {
         showToast('Document renamed successfully', 'success');
@@ -251,11 +291,16 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
   // Delete document
   const handleDeleteDoc = async (docId: string) => {
-    if (!window.confirm('Are you sure you want to delete this document? This will delete all its content chunks and embeddings!')) return;
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this document? This will delete all its content chunks and embeddings!'
+      )
+    )
+      return;
     try {
       const res = await fetch(`${apiUrl}/api/documents/${docId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         showToast('Document and embeddings deleted successfully', 'success');
@@ -282,9 +327,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ chunk_text: editingChunkText.trim() })
+        body: JSON.stringify({ chunk_text: editingChunkText.trim() }),
       });
       if (res.ok) {
         showToast('Chunk text updated and embedding vector re-generated!', 'success');
@@ -303,11 +348,16 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
   // Delete chunk
   const handleDeleteChunk = async (chunkId: string) => {
-    if (!window.confirm('Are you sure you want to delete this chunk? Any questions linked to this chunk will lose their chunk attribution.')) return;
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this chunk? Any questions linked to this chunk will lose their chunk attribution.'
+      )
+    )
+      return;
     try {
       const res = await fetch(`${apiUrl}/api/documents/chunks/${chunkId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         showToast('Chunk deleted successfully', 'success');
@@ -327,11 +377,13 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     setEqExplanation(q.explanation || '');
     setEqDifficulty(q.difficulty);
     setEqTagsInput(q.tags.join(', '));
-    setEqOptions(q.options.map(opt => ({
-      id: opt.id,
-      text: opt.option_text,
-      isCorrect: opt.is_correct
-    })));
+    setEqOptions(
+      q.options.map(opt => ({
+        id: opt.id,
+        text: opt.option_text,
+        isCorrect: opt.is_correct,
+      }))
+    );
   };
 
   // Save question updates
@@ -358,13 +410,16 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
       question_text: eqText.trim(),
       explanation: eqExplanation.trim() || null,
       difficulty: eqDifficulty,
-      tags: eqTagsInput.split(',').map(t => t.trim().toLowerCase()).filter(Boolean),
+      tags: eqTagsInput
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean),
       options: eqOptions.map((opt, idx) => ({
         id: opt.id || null,
         option_text: opt.text.trim(),
         is_correct: opt.isCorrect,
-        option_order: idx
-      }))
+        option_order: idx,
+      })),
     };
 
     try {
@@ -372,9 +427,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         showToast('Question updated successfully!', 'success');
@@ -398,7 +453,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     try {
       const res = await fetch(`${apiUrl}/api/questions/${qId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         showToast('Question deleted successfully', 'success');
@@ -421,9 +476,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name: targetName })
+        body: JSON.stringify({ name: targetName }),
       });
       if (res.ok) {
         showToast('Tag renamed and updated successfully', 'success');
@@ -443,11 +498,16 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
   // Delete tag
   const handleDeleteTag = async (tagId: string) => {
-    if (!window.confirm('Are you sure you want to delete this tag? It will be unlinked from all questions.')) return;
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this tag? It will be unlinked from all questions.'
+      )
+    )
+      return;
     try {
       const res = await fetch(`${apiUrl}/api/questions/tags/${tagId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         showToast('Tag deleted successfully', 'success');
@@ -466,15 +526,13 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     setEqOptions(prev =>
       prev.map((opt, i) => ({
         ...opt,
-        isCorrect: i === idx // enforce single correct option for MCQs
+        isCorrect: i === idx, // enforce single correct option for MCQs
       }))
     );
   };
 
   const handleOptionTextChange = (idx: number, text: string) => {
-    setEqOptions(prev =>
-      prev.map((opt, i) => (i === idx ? { ...opt, text } : opt))
-    );
+    setEqOptions(prev => prev.map((opt, i) => (i === idx ? { ...opt, text } : opt)));
   };
 
   // Filters for questions list
@@ -492,7 +550,14 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       {/* Sub-tabs header */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', gap: '16px', paddingBottom: '4px' }}>
+      <div
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--border-color)',
+          gap: '16px',
+          paddingBottom: '4px',
+        }}
+      >
         <button
           onClick={() => setSubTab('documents')}
           style={{
@@ -502,11 +567,12 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             color: subTab === 'documents' ? 'var(--accent-primary)' : 'var(--text-secondary)',
             fontWeight: subTab === 'documents' ? 700 : 400,
             cursor: 'pointer',
-            borderBottom: subTab === 'documents' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            borderBottom:
+              subTab === 'documents' ? '2px solid var(--accent-primary)' : '2px solid transparent',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
           }}
         >
           <FileText size={18} />
@@ -521,11 +587,12 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             color: subTab === 'questions' ? 'var(--accent-primary)' : 'var(--text-secondary)',
             fontWeight: subTab === 'questions' ? 700 : 400,
             cursor: 'pointer',
-            borderBottom: subTab === 'questions' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            borderBottom:
+              subTab === 'questions' ? '2px solid var(--accent-primary)' : '2px solid transparent',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
           }}
         >
           <BookOpen size={18} />
@@ -540,11 +607,12 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             color: subTab === 'tags' ? 'var(--accent-primary)' : 'var(--text-secondary)',
             fontWeight: subTab === 'tags' ? 700 : 400,
             cursor: 'pointer',
-            borderBottom: subTab === 'tags' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            borderBottom:
+              subTab === 'tags' ? '2px solid var(--accent-primary)' : '2px solid transparent',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
           }}
         >
           <TagIcon size={18} />
@@ -554,7 +622,14 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
       {/* SUB-VIEW 1: Documents & Embeddings */}
       {subTab === 'documents' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: '30px', alignItems: 'start' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '2fr 3fr',
+            gap: '30px',
+            alignItems: 'start',
+          }}
+        >
           {/* Document list */}
           <div className="glass-card">
             <h3 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -563,11 +638,26 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             </h3>
 
             {isLoadingDocs ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '40px 0',
+                  color: 'var(--text-secondary)',
+                }}
+              >
                 <Loader2 size={24} className="animate-spin" />
               </div>
             ) : documents.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', border: '1px dashed var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)' }}>
+              <div
+                style={{
+                  padding: '30px',
+                  textAlign: 'center',
+                  border: '1px dashed var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--text-secondary)',
+                }}
+              >
                 No documents found for this topic. Upload materials in the Setup tab first.
               </div>
             ) : (
@@ -583,14 +673,23 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                         padding: '14px',
                         borderRadius: '10px',
                         background: isSelected ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.01)',
-                        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                        border: isSelected
+                          ? '1px solid var(--accent-primary)'
+                          : '1px solid var(--border-color)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '10px',
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px',
+                        }}
+                      >
                         <div
                           onClick={() => {
                             if (!isEditing) {
@@ -604,10 +703,14 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             gap: '10px',
                             cursor: 'pointer',
                             flex: 1,
-                            minWidth: 0
+                            minWidth: 0,
                           }}
                         >
-                          <FileText size={18} color="var(--accent-secondary)" style={{ flexShrink: 0 }} />
+                          <FileText
+                            size={18}
+                            color="var(--accent-secondary)"
+                            style={{ flexShrink: 0 }}
+                          />
                           {isEditing ? (
                             <input
                               type="text"
@@ -626,7 +729,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                                 background: 'rgba(0,0,0,0.3)',
                                 border: '1px solid var(--accent-primary)',
                                 color: '#fff',
-                                borderRadius: '4px'
+                                borderRadius: '4px',
                               }}
                             />
                           ) : (
@@ -645,19 +748,40 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                         </div>
 
                         {/* Document Actions */}
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '6px',
+                            alignItems: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
                           {isEditing ? (
                             <>
                               <button
                                 onClick={() => handleRenameDoc(doc.id)}
                                 disabled={isSavingDoc}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-teal)' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--accent-teal)',
+                                }}
                               >
-                                {isSavingDoc ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                {isSavingDoc ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <Save size={16} />
+                                )}
                               </button>
                               <button
                                 onClick={() => setEditingDocId(null)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--text-muted)',
+                                }}
                               >
                                 <X size={16} />
                               </button>
@@ -665,22 +789,32 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                           ) : (
                             <>
                               <button
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   setEditingDocId(doc.id);
                                   setEditingDocName(doc.original_filename);
                                 }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--text-secondary)',
+                                }}
                                 title="Rename"
                               >
                                 <Edit3 size={15} />
                               </button>
                               <button
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   handleDeleteDoc(doc.id);
                                 }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: '#ef4444',
+                                }}
                                 title="Delete"
                               >
                                 <Trash2 size={15} />
@@ -689,10 +823,28 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                           )}
                         </div>
                       </div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        <span style={{ textTransform: 'capitalize' }}>Source: {doc.source_type.replace('upload_', '')}</span>
-                        <span>Status: <strong style={{ color: doc.status === 'parsed' ? 'var(--accent-teal)' : '#f59e0b' }}>{doc.status}</strong></span>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        <span style={{ textTransform: 'capitalize' }}>
+                          Source: {doc.source_type.replace('upload_', '')}
+                        </span>
+                        <span>
+                          Status:{' '}
+                          <strong
+                            style={{
+                              color: doc.status === 'parsed' ? 'var(--accent-teal)' : '#f59e0b',
+                            }}
+                          >
+                            {doc.status}
+                          </strong>
+                        </span>
                       </div>
                     </div>
                   );
@@ -703,14 +855,30 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
           {/* Chunks Explorer */}
           <div className="glass-card" style={{ minHeight: '380px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '16px',
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+              }}
+            >
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Sparkles size={18} color="var(--accent-teal)" />
                 Vector Embeddings Explorer
               </h3>
-              
+
               {selectedDocId && (
-                <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '220px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    position: 'relative',
+                    width: '220px',
+                  }}
+                >
                   <input
                     type="text"
                     placeholder="Search chunk text..."
@@ -723,21 +891,46 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       background: 'rgba(0,0,0,0.2)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '6px',
-                      color: '#fff'
+                      color: '#fff',
                     }}
                   />
-                  <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px' }} />
+                  <Search
+                    size={14}
+                    color="var(--text-muted)"
+                    style={{ position: 'absolute', left: '10px' }}
+                  />
                 </div>
               )}
             </div>
 
             {!selectedDocId ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', color: 'var(--text-muted)', textAlign: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '80px 20px',
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                  gap: '12px',
+                }}
+              >
                 <Database size={36} color="var(--text-muted)" style={{ opacity: 0.5 }} />
-                <p style={{ fontSize: '0.9rem', margin: 0 }}>Select a document on the left to browse, search, and edit its raw chunk vector embeddings.</p>
+                <p style={{ fontSize: '0.9rem', margin: 0 }}>
+                  Select a document on the left to browse, search, and edit its raw chunk vector
+                  embeddings.
+                </p>
               </div>
             ) : isLoadingChunks ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '60px 0',
+                  color: 'var(--text-secondary)',
+                }}
+              >
                 <Loader2 size={24} className="animate-spin" />
               </div>
             ) : filteredChunks.length === 0 ? (
@@ -745,10 +938,19 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                 No chunks found matching search query.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '550px', paddingRight: '4px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  overflowY: 'auto',
+                  maxHeight: '550px',
+                  paddingRight: '4px',
+                }}
+              >
                 {filteredChunks.map(chunk => {
                   const isEditing = editingChunkId === chunk.id;
-                  
+
                   return (
                     <div
                       key={chunk.id}
@@ -759,14 +961,28 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                         border: '1px solid var(--border-color)',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '12px'
+                        gap: '12px',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--accent-teal)', fontWeight: 600 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                          paddingBottom: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            color: 'var(--accent-teal)',
+                            fontWeight: 600,
+                          }}
+                        >
                           Chunk #{chunk.chunk_index + 1}
                         </span>
-                        
+
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           {isEditing ? (
                             <>
@@ -774,13 +990,29 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                                 onClick={() => handleUpdateChunk(chunk.id)}
                                 disabled={isSavingChunk}
                                 className="btn btn-secondary"
-                                style={{ padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', background: 'var(--accent-primary-glow)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  background: 'var(--accent-primary-glow)',
+                                  color: 'var(--accent-primary)',
+                                  border: '1px solid var(--accent-primary)',
+                                }}
                               >
-                                {isSavingChunk ? <Loader2 size={13} className="animate-spin" /> : 'Save & Embed'}
+                                {isSavingChunk ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  'Save & Embed'
+                                )}
                               </button>
                               <button
                                 onClick={() => setEditingChunkId(null)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--text-muted)',
+                                }}
                               >
                                 <X size={16} />
                               </button>
@@ -792,14 +1024,24 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                                   setEditingChunkId(chunk.id);
                                   setEditingChunkText(chunk.chunk_text);
                                 }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: 'var(--text-secondary)',
+                                }}
                                 title="Edit chunk text & recalculate embedding"
                               >
                                 <Edit3 size={14} />
                               </button>
                               <button
                                 onClick={() => handleDeleteChunk(chunk.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: '#ef4444',
+                                }}
                                 title="Delete chunk"
                               >
                                 <Trash2 size={14} />
@@ -821,16 +1063,30 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             border: '1px solid var(--border-focus)',
                             color: '#fff',
                             borderRadius: '6px',
-                            resize: 'vertical'
+                            resize: 'vertical',
                           }}
                         />
                       ) : (
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+                        <p
+                          style={{
+                            fontSize: '0.85rem',
+                            color: 'var(--text-secondary)',
+                            margin: 0,
+                            lineHeight: 1.6,
+                          }}
+                        >
                           {chunk.chunk_text}
                         </p>
                       )}
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.7rem',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
                         <span>ID: {chunk.id.substring(0, 8)}...</span>
                         <span>Vector Size: 768 float32s</span>
                       </div>
@@ -846,9 +1102,365 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
       {/* SUB-VIEW 2: Questions Bank */}
       {subTab === 'questions' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Broad level analytics panel */}
+          {analytics && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gap: '20px',
+                width: '100%',
+              }}
+              className="analytics-grid"
+            >
+              {/* Left Column: Topic Stats & Difficulty distribution */}
+              <div
+                className="glass-card"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  padding: '24px',
+                  background:
+                    'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '16px',
+                }}
+              >
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <h4
+                    style={{
+                      margin: 0,
+                      fontSize: '1.1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <Sparkles size={16} color="var(--accent-primary)" />
+                    Topic Analytics: {selectedTopic?.name}
+                  </h4>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Total Questions: <strong>{analytics.total_questions}</strong>
+                  </span>
+                </div>
+
+                {/* Stat cards row */}
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}
+                >
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      background: 'rgba(20,184,166,0.03)',
+                      border: '1px solid rgba(20,184,166,0.15)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-teal)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Easy
+                    </span>
+                    <strong style={{ fontSize: '1.25rem', color: '#fff' }}>
+                      {analytics.difficulty_breakdown.easy || 0}
+                    </strong>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      {analytics.total_questions > 0
+                        ? Math.round(
+                            ((analytics.difficulty_breakdown.easy || 0) /
+                              analytics.total_questions) *
+                              100
+                          )
+                        : 0}
+                      %
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      background: 'rgba(168,85,247,0.03)',
+                      border: '1px solid rgba(168,85,247,0.15)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-secondary)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Medium
+                    </span>
+                    <strong style={{ fontSize: '1.25rem', color: '#fff' }}>
+                      {analytics.difficulty_breakdown.medium || 0}
+                    </strong>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      {analytics.total_questions > 0
+                        ? Math.round(
+                            ((analytics.difficulty_breakdown.medium || 0) /
+                              analytics.total_questions) *
+                              100
+                          )
+                        : 0}
+                      %
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      background: 'rgba(239,68,68,0.03)',
+                      border: '1px solid rgba(239,68,68,0.15)',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#ef4444',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Hard
+                    </span>
+                    <strong style={{ fontSize: '1.25rem', color: '#fff' }}>
+                      {analytics.difficulty_breakdown.hard || 0}
+                    </strong>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                      {analytics.total_questions > 0
+                        ? Math.round(
+                            ((analytics.difficulty_breakdown.hard || 0) /
+                              analytics.total_questions) *
+                              100
+                          )
+                        : 0}
+                      %
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stacked distribution progress bar */}
+                {analytics.total_questions > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      Difficulty Distribution Breakdown
+                    </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        height: '8px',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        background: 'rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${((analytics.difficulty_breakdown.easy || 0) / analytics.total_questions) * 100}%`,
+                          background: 'var(--accent-teal)',
+                        }}
+                        title={`Easy: ${analytics.difficulty_breakdown.easy}`}
+                      />
+                      <div
+                        style={{
+                          width: `${((analytics.difficulty_breakdown.medium || 0) / analytics.total_questions) * 100}%`,
+                          background: 'var(--accent-secondary)',
+                        }}
+                        title={`Medium: ${analytics.difficulty_breakdown.medium}`}
+                      />
+                      <div
+                        style={{
+                          width: `${((analytics.difficulty_breakdown.hard || 0) / analytics.total_questions) * 100}%`,
+                          background: '#ef4444',
+                        }}
+                        title={`Hard: ${analytics.difficulty_breakdown.hard}`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Concept/Tag breakdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span
+                    style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}
+                  >
+                    Concept / Tag Breakdown:
+                  </span>
+                  {analytics.tag_breakdown.length === 0 ? (
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      No concepts defined yet.
+                    </span>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {analytics.tag_breakdown.map(t => (
+                        <div
+                          key={t.tag_name}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            background: 'rgba(99,102,241,0.06)',
+                            border: '1px solid rgba(99,102,241,0.15)',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          <span style={{ color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
+                            {t.tag_name}
+                          </span>
+                          <span
+                            style={{
+                              background: 'rgba(99,102,241,0.2)',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              padding: '1px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {t.question_count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Global Topic Distribution */}
+              <div
+                className="glass-card"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  padding: '24px',
+                  background: 'rgba(255,255,255,0.01)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '16px',
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    fontSize: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <BookOpen size={16} color="var(--accent-teal)" />
+                  Questions Across Subjects
+                </h4>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    overflowY: 'auto',
+                    maxHeight: '180px',
+                    paddingRight: '4px',
+                  }}
+                >
+                  {analytics.topic_breakdown.map(tb => {
+                    const isCurrent = tb.topic_name === selectedTopic?.name;
+                    return (
+                      <div
+                        key={tb.topic_name}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          background: isCurrent
+                            ? 'rgba(20,184,166,0.06)'
+                            : 'rgba(255,255,255,0.01)',
+                          border: isCurrent
+                            ? '1px solid rgba(20,184,166,0.2)'
+                            : '1px solid rgba(255,255,255,0.03)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontSize: '0.82rem',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: isCurrent ? 700 : 400,
+                              color: isCurrent ? 'var(--accent-teal)' : 'var(--text-secondary)',
+                            }}
+                          >
+                            {tb.topic_name} {isCurrent && ' (Active)'}
+                          </span>
+                          <span style={{ fontWeight: 600, color: '#fff' }}>
+                            {tb.question_count} Qs
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Question search and filter panel */}
-          <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '280px' }}>
+          <div
+            className="glass-card"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '16px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 24px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                flex: 1,
+                minWidth: '280px',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', position: 'relative', flex: 1 }}>
                 <input
                   type="text"
@@ -862,10 +1474,14 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                     background: 'rgba(255, 255, 255, 0.02)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '8px',
-                    color: '#fff'
+                    color: '#fff',
                   }}
                 />
-                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px' }} />
+                <Search
+                  size={16}
+                  color="var(--text-muted)"
+                  style={{ position: 'absolute', left: '12px' }}
+                />
               </div>
             </div>
 
@@ -873,7 +1489,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Filter size={14} color="var(--text-secondary)" />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Difficulty:</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Difficulty:
+                </span>
                 <select
                   value={difficultyFilter}
                   onChange={e => setDifficultyFilter(e.target.value)}
@@ -907,12 +1525,23 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
           {/* Question List */}
           {isLoadingQuestions ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '60px 0',
+                color: 'var(--text-secondary)',
+              }}
+            >
               <Loader2 size={24} className="animate-spin" />
             </div>
           ) : filteredQuestions.length === 0 ? (
-            <div className="glass-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              No questions found for this topic with active filters. Generate some MCQs or check details.
+            <div
+              className="glass-card"
+              style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}
+            >
+              No questions found for this topic with active filters. Generate some MCQs or check
+              details.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -925,13 +1554,22 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '16px',
-                    borderLeft: '4px solid var(--accent-primary)'
+                    borderLeft: '4px solid var(--accent-primary)',
                   }}
                 >
                   {/* Item Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '10px',
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      <span
+                        style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}
+                      >
                         Question {qi + 1}
                       </span>
                       <span
@@ -952,7 +1590,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                               ? 'var(--accent-teal)'
                               : q.difficulty === 'hard'
                                 ? '#ef4444'
-                                : 'var(--accent-secondary)'
+                                : 'var(--accent-secondary)',
                         }}
                       >
                         {q.difficulty}
@@ -963,7 +1601,12 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       <button
                         onClick={() => startEditQuestion(q)}
                         className="btn btn-secondary"
-                        style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', gap: '4px' }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          gap: '4px',
+                        }}
                       >
                         <Edit3 size={13} />
                         <span>Edit</span>
@@ -971,7 +1614,15 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       <button
                         onClick={() => handleDeleteQuestion(q.id)}
                         className="btn btn-secondary"
-                        style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', gap: '4px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.02)' }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          gap: '4px',
+                          color: '#ef4444',
+                          borderColor: 'rgba(239,68,68,0.2)',
+                          background: 'rgba(239,68,68,0.02)',
+                        }}
                       >
                         <Trash2 size={13} />
                         <span>Delete</span>
@@ -980,7 +1631,15 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                   </div>
 
                   {/* Question body text */}
-                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {q.question_text}
                   </p>
 
@@ -992,13 +1651,17 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                         style={{
                           padding: '10px 14px',
                           borderRadius: '8px',
-                          background: opt.is_correct ? 'rgba(20,184,166,0.06)' : 'rgba(255,255,255,0.01)',
-                          border: opt.is_correct ? '1px solid rgba(20,184,166,0.3)' : '1px solid var(--border-color)',
+                          background: opt.is_correct
+                            ? 'rgba(20,184,166,0.06)'
+                            : 'rgba(255,255,255,0.01)',
+                          border: opt.is_correct
+                            ? '1px solid rgba(20,184,166,0.3)'
+                            : '1px solid var(--border-color)',
                           color: opt.is_correct ? 'var(--accent-teal)' : 'var(--text-secondary)',
                           fontSize: '0.88rem',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px'
+                          gap: '8px',
                         }}
                       >
                         <span
@@ -1011,29 +1674,51 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             justifyContent: 'center',
                             fontSize: '0.72rem',
                             fontWeight: 700,
-                            background: opt.is_correct ? 'var(--accent-teal)' : 'rgba(255,255,255,0.05)',
-                            color: opt.is_correct ? '#fff' : 'var(--text-muted)'
+                            background: opt.is_correct
+                              ? 'var(--accent-teal)'
+                              : 'rgba(255,255,255,0.05)',
+                            color: opt.is_correct ? '#fff' : 'var(--text-muted)',
                           }}
                         >
                           {String.fromCharCode(65 + opt.option_order)}
                         </span>
                         <span>{opt.option_text}</span>
-                        {opt.is_correct && <CheckCircle2 size={14} style={{ marginLeft: 'auto' }} />}
+                        {opt.is_correct && (
+                          <CheckCircle2 size={14} style={{ marginLeft: 'auto' }} />
+                        )}
                       </div>
                     ))}
                   </div>
 
                   {/* Explanation and Tags */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      paddingTop: '10px',
+                      borderTop: '1px solid rgba(255,255,255,0.03)',
+                    }}
+                  >
                     {q.explanation && (
                       <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
-                        <strong style={{ color: 'var(--accent-primary)' }}>Explanation:</strong> {q.explanation}
+                        <strong style={{ color: 'var(--accent-primary)' }}>Explanation:</strong>{' '}
+                        {q.explanation}
                       </p>
                     )}
-                    
+
                     {q.tags.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Tags:</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Tags:
+                        </span>
                         {q.tags.map(t => (
                           <span
                             key={t}
@@ -1043,7 +1728,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                               background: 'rgba(99,102,241,0.08)',
                               border: '1px solid rgba(99,102,241,0.2)',
                               color: 'var(--accent-primary)',
-                              fontSize: '0.7rem'
+                              fontSize: '0.7rem',
                             }}
                           >
                             {t}
@@ -1072,7 +1757,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '20px'
+                padding: '20px',
               }}
             >
               <div
@@ -1086,23 +1771,38 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                   border: '1px solid var(--border-color)',
                   boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                   padding: '30px',
-                  borderRadius: '16px'
+                  borderRadius: '16px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '24px',
+                  }}
+                >
                   <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Sparkles size={18} color="var(--accent-primary)" />
                     Edit Question Details
                   </h3>
                   <button
                     onClick={() => setEditingQuestion(null)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)',
+                    }}
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveQuestion} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <form
+                  onSubmit={handleSaveQuestion}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+                >
                   <div className="form-group">
                     <label>Question Text</label>
                     <textarea
@@ -1142,10 +1842,15 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
                   {/* Options management */}
                   <div>
-                    <label style={{ display: 'block', marginBottom: '10px' }}>Answer Options (Exactly one correct)</label>
+                    <label style={{ display: 'block', marginBottom: '10px' }}>
+                      Answer Options (Exactly one correct)
+                    </label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {eqOptions.map((opt, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div
+                          key={idx}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+                        >
                           <button
                             type="button"
                             onClick={() => toggleOptionCorrectness(idx)}
@@ -1156,17 +1861,23 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                               width: '32px',
                               height: '32px',
                               borderRadius: '50%',
-                              border: opt.isCorrect ? '1px solid var(--accent-teal)' : '1px solid var(--border-color)',
+                              border: opt.isCorrect
+                                ? '1px solid var(--accent-teal)'
+                                : '1px solid var(--border-color)',
                               background: opt.isCorrect ? 'var(--accent-teal-glow)' : 'transparent',
                               color: opt.isCorrect ? 'var(--accent-teal)' : 'var(--text-muted)',
                               cursor: 'pointer',
-                              flexShrink: 0
+                              flexShrink: 0,
                             }}
-                            title={opt.isCorrect ? "Correct Option" : "Set as Correct Option"}
+                            title={opt.isCorrect ? 'Correct Option' : 'Set as Correct Option'}
                           >
-                            {opt.isCorrect ? <CheckCircle2 size={16} /> : <span>{String.fromCharCode(65 + idx)}</span>}
+                            {opt.isCorrect ? (
+                              <CheckCircle2 size={16} />
+                            ) : (
+                              <span>{String.fromCharCode(65 + idx)}</span>
+                            )}
                           </button>
-                          
+
                           <input
                             type="text"
                             value={opt.text}
@@ -1191,7 +1902,14 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                     />
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '12px',
+                      marginTop: '10px',
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => setEditingQuestion(null)}
@@ -1205,7 +1923,11 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       className="btn btn-primary"
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      {isSavingQuestion ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {isSavingQuestion ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Save size={16} />
+                      )}
                       <span>Save Question Changes</span>
                     </button>
                   </div>
@@ -1223,17 +1945,41 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
             <TagIcon size={18} color="var(--accent-primary)" />
             Concept Taxonomy Tags
           </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.5 }}>
-            Manage the conceptual tags registered for this topic. Renaming a tag to match an existing tag will automatically **merge** their question associations!
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '24px',
+              lineHeight: 1.5,
+            }}
+          >
+            Manage the conceptual tags registered for this topic. Renaming a tag to match an
+            existing tag will automatically **merge** their question associations!
           </p>
 
           {isLoadingTags ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '40px 0',
+                color: 'var(--text-secondary)',
+              }}
+            >
               <Loader2 size={24} className="animate-spin" />
             </div>
           ) : tags.length === 0 ? (
-            <div style={{ padding: '30px', textAlign: 'center', border: '1px dashed var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)' }}>
-              No concept tags defined yet. Ingest documents or generate questions to initialize the taxonomy.
+            <div
+              style={{
+                padding: '30px',
+                textAlign: 'center',
+                border: '1px dashed var(--border-color)',
+                borderRadius: '8px',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              No concept tags defined yet. Ingest documents or generate questions to initialize the
+              taxonomy.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1251,10 +1997,18 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '12px'
+                      gap: '12px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
                       <TagIcon size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
                       {isEditing ? (
                         <input
@@ -1273,7 +2027,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             background: 'rgba(0,0,0,0.3)',
                             border: '1px solid var(--accent-primary)',
                             color: '#fff',
-                            borderRadius: '4px'
+                            borderRadius: '4px',
                           }}
                         />
                       ) : (
@@ -1284,7 +2038,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             fontFamily: 'monospace',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis'
+                            textOverflow: 'ellipsis',
                           }}
                         >
                           {tag.name}
@@ -1292,19 +2046,35 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                    <div
+                      style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}
+                    >
                       {isEditing ? (
                         <>
                           <button
                             onClick={() => handleRenameTag(tag.id)}
                             disabled={isSavingTag}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-teal)' }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--accent-teal)',
+                            }}
                           >
-                            {isSavingTag ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            {isSavingTag ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Save size={14} />
+                            )}
                           </button>
                           <button
                             onClick={() => setEditingTagId(null)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                            }}
                           >
                             <X size={14} />
                           </button>
@@ -1316,14 +2086,24 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                               setEditingTagId(tag.id);
                               setEditingTagName(tag.name);
                             }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-secondary)',
+                            }}
                             title="Rename tag"
                           >
                             <Edit3 size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteTag(tag.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#ef4444',
+                            }}
                             title="Delete tag"
                           >
                             <Trash2 size={14} />

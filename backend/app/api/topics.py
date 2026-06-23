@@ -80,11 +80,7 @@ def update_topic(
     """
     Update the name and/or description of an existing topic owned by the authenticated user.
     """
-    topic = (
-        db.query(Topic)
-        .filter(Topic.id == topic_id, Topic.user_id == current_user.id)
-        .first()
-    )
+    topic = db.query(Topic).filter(Topic.id == topic_id, Topic.user_id == current_user.id).first()
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found.")
 
@@ -125,11 +121,7 @@ def delete_topic(
     Delete a topic and all its associated data (documents, questions, sessions, tags)
     owned by the authenticated user.
     """
-    topic = (
-        db.query(Topic)
-        .filter(Topic.id == topic_id, Topic.user_id == current_user.id)
-        .first()
-    )
+    topic = db.query(Topic).filter(Topic.id == topic_id, Topic.user_id == current_user.id).first()
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found.")
 
@@ -138,4 +130,3 @@ def delete_topic(
     )
     db.delete(topic)
     db.commit()
-

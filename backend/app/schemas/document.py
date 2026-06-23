@@ -35,4 +35,3 @@ class ContentChunkResponse(BaseModel):
 
 class ChunkUpdateRequest(BaseModel):
     chunk_text: str
-

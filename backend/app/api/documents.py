@@ -19,19 +19,19 @@ from sqlalchemy.orm import Session
 from app.api.auth_dependencies import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.document import Document
 from app.models.content_chunk import ContentChunk
+from app.models.document import Document
 from app.models.job import Job
 from app.models.topic import Topic
 from app.models.user import User
 from app.schemas.document import (
+    ChunkUpdateRequest,
+    ContentChunkResponse,
     DocumentResponse,
     DocumentUpdateRequest,
-    ContentChunkResponse,
-    ChunkUpdateRequest,
 )
-from app.workers.ingestion import process_document_task
 from app.services.llm_service import embed_text
+from app.workers.ingestion import process_document_task
 
 logger = logging.getLogger(__name__)
 
@@ -387,17 +387,20 @@ def update_document(
     """
     Rename a document.
     """
-    doc = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    doc = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
-    
+
     doc.original_filename = payload.original_filename
     db.commit()
     db.refresh(doc)
-    logger.info(f"User {current_user.email} renamed document {document_id} to '{payload.original_filename}'")
+    logger.info(
+        f"User {current_user.email} renamed document {document_id} to '{payload.original_filename}'"
+    )
     return doc
 
 
@@ -410,13 +413,14 @@ def delete_document(
     """
     Delete a document from DB (cascades to chunks) and delete physical file.
     """
-    doc = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    doc = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
-    
+
     # Try deleting the physical file
     if doc.storage_path and os.path.exists(doc.storage_path):
         try:
@@ -424,7 +428,7 @@ def delete_document(
             logger.info(f"Deleted physical file: {doc.storage_path}")
         except Exception as e:
             logger.error(f"Failed to delete physical file {doc.storage_path}: {e}")
-            
+
     db.delete(doc)
     db.commit()
     logger.info(f"User {current_user.email} deleted document {document_id} and all related chunks.")
@@ -441,18 +445,21 @@ def list_document_chunks(
     List content chunks for a specific document.
     """
     # Enforce isolation
-    doc = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
+    doc = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
-        
-    chunks = db.query(ContentChunk).filter(
-        ContentChunk.document_id == document_id,
-        ContentChunk.user_id == current_user.id
-    ).order_by(ContentChunk.chunk_index.asc()).all()
-    
+
+    chunks = (
+        db.query(ContentChunk)
+        .filter(ContentChunk.document_id == document_id, ContentChunk.user_id == current_user.id)
+        .order_by(ContentChunk.chunk_index.asc())
+        .all()
+    )
+
     return chunks
 
 
@@ -466,15 +473,16 @@ def update_chunk(
     """
     Update content chunk text and re-generate pgvector embedding.
     """
-    chunk = db.query(ContentChunk).filter(
-        ContentChunk.id == chunk_id,
-        ContentChunk.user_id == current_user.id
-    ).first()
+    chunk = (
+        db.query(ContentChunk)
+        .filter(ContentChunk.id == chunk_id, ContentChunk.user_id == current_user.id)
+        .first()
+    )
     if not chunk:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found.")
-        
+
     chunk.chunk_text = payload.chunk_text
-    
+
     # Regenerate embedding
     try:
         embeddings = embed_text([payload.chunk_text])
@@ -485,9 +493,9 @@ def update_chunk(
         logger.error(f"Error regenerating embedding during chunk update: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to regenerate embedding: {str(e)}"
+            detail=f"Failed to regenerate embedding: {str(e)}",
         )
-        
+
     db.commit()
     db.refresh(chunk)
     return chunk
@@ -502,13 +510,14 @@ def delete_chunk(
     """
     Delete a single content chunk.
     """
-    chunk = db.query(ContentChunk).filter(
-        ContentChunk.id == chunk_id,
-        ContentChunk.user_id == current_user.id
-    ).first()
+    chunk = (
+        db.query(ContentChunk)
+        .filter(ContentChunk.id == chunk_id, ContentChunk.user_id == current_user.id)
+        .first()
+    )
     if not chunk:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found.")
-        
+
     db.delete(chunk)
     db.commit()
     logger.info(f"User {current_user.email} deleted chunk {chunk_id}")

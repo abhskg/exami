@@ -44,7 +44,6 @@ class Settings(BaseSettings):
     UPLOADS_DIR: str = "./data/uploads"
     MAX_FILE_SIZE_MB: int = 15
 
-
     model_config = SettingsConfigDict(
         # Load from backend/.env if present, otherwise fallback to system environment variables
         env_file=str(ENV_FILE) if ENV_FILE.exists() else None,

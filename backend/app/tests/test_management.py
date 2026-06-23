@@ -1,15 +1,16 @@
 import uuid
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import create_access_token, get_password_hash
 from app.main import app
-from app.models.document import Document
 from app.models.content_chunk import ContentChunk
+from app.models.document import Document
 from app.models.question import Question, QuestionOption, question_tags
 from app.models.tag import Tag
 from app.models.topic import Topic
@@ -96,7 +97,7 @@ class TestManagementAPI:
             user_id=test_topic.user_id,
             topic_id=test_topic.id,
             chunk_text="Some chunk content text",
-            chunk_index=0
+            chunk_index=0,
         )
         db.add(chunk)
         db.commit()
@@ -116,10 +117,7 @@ class TestManagementAPI:
         assert doc.original_filename == "renamed_doc_name.txt"
 
         # 3. Retrieve chunks
-        resp_chunks = client.get(
-            f"/api/documents/{doc.id}/chunks",
-            headers=auth_headers
-        )
+        resp_chunks = client.get(f"/api/documents/{doc.id}/chunks", headers=auth_headers)
         assert resp_chunks.status_code == 200
         assert len(resp_chunks.json()) == 1
         assert resp_chunks.json()[0]["chunk_text"] == "Some chunk content text"
@@ -156,7 +154,7 @@ class TestManagementAPI:
             user_id=test_topic.user_id,
             topic_id=test_topic.id,
             chunk_text="Initial chunk text content.",
-            chunk_index=0
+            chunk_index=0,
         )
         db.add(chunk)
         db.commit()
@@ -178,10 +176,7 @@ class TestManagementAPI:
         assert chunk.embedding is not None
 
         # Delete chunk
-        resp_del = client.delete(
-            f"/api/documents/chunks/{chunk.id}",
-            headers=auth_headers
-        )
+        resp_del = client.delete(f"/api/documents/chunks/{chunk.id}", headers=auth_headers)
         assert resp_del.status_code == 200
 
         deleted_chunk = db.query(ContentChunk).filter(ContentChunk.id == chunk.id).first()
@@ -201,8 +196,12 @@ class TestManagementAPI:
         db.add(q)
         db.flush()
 
-        opt1 = QuestionOption(question_id=q.id, option_text="Opt A", is_correct=True, option_order=0)
-        opt2 = QuestionOption(question_id=q.id, option_text="Opt B", is_correct=False, option_order=1)
+        opt1 = QuestionOption(
+            question_id=q.id, option_text="Opt A", is_correct=True, option_order=0
+        )
+        opt2 = QuestionOption(
+            question_id=q.id, option_text="Opt B", is_correct=False, option_order=1
+        )
         db.add(opt1)
         db.add(opt2)
 
@@ -222,11 +221,15 @@ class TestManagementAPI:
                 "difficulty": "hard",
                 "tags": ["updated_tag", "new_concept"],
                 "options": [
-                    {"option_text": "New Opt A (Incorrect)", "is_correct": False, "option_order": 0},
+                    {
+                        "option_text": "New Opt A (Incorrect)",
+                        "is_correct": False,
+                        "option_order": 0,
+                    },
                     {"option_text": "New Opt B (Correct)", "is_correct": True, "option_order": 1},
-                ]
+                ],
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
         assert resp_update.status_code == 200, resp_update.text
         body = resp_update.json()
@@ -239,10 +242,7 @@ class TestManagementAPI:
         assert set(body["tags"]) == {"updated_tag", "new_concept"}
 
         # 3. Delete question
-        resp_del = client.delete(
-            f"/api/questions/{q.id}",
-            headers=auth_headers
-        )
+        resp_del = client.delete(f"/api/questions/{q.id}", headers=auth_headers)
         assert resp_del.status_code == 200
 
         deleted_q = db.query(Question).filter(Question.id == q.id).first()
@@ -263,7 +263,7 @@ class TestManagementAPI:
             topic_id=test_topic.id,
             question_text="Linked to tag one?",
             difficulty="easy",
-            generated_by="manual"
+            generated_by="manual",
         )
         db.add(q)
         db.flush()
@@ -272,21 +272,17 @@ class TestManagementAPI:
 
         # 2. Rename tag_one -> tag_three (simple rename)
         resp_rename = client.put(
-            f"/api/questions/tags/{t1.id}",
-            json={"name": "tag_three"},
-            headers=auth_headers
+            f"/api/questions/tags/{t1.id}", json={"name": "tag_three"}, headers=auth_headers
         )
         assert resp_rename.status_code == 200
         assert resp_rename.json()["name"] == "tag_three"
-        
+
         db.refresh(t1)
         assert t1.name == "tag_three"
 
         # 3. Rename tag_three -> tag_two (merges with existing tag_two!)
         resp_merge = client.put(
-            f"/api/questions/tags/{t1.id}",
-            json={"name": "tag_two"},
-            headers=auth_headers
+            f"/api/questions/tags/{t1.id}", json={"name": "tag_two"}, headers=auth_headers
         )
         assert resp_merge.status_code == 200
         # Should return existing tag_two
@@ -300,15 +296,12 @@ class TestManagementAPI:
         # Verify question is now linked to tag_two
         link = db.execute(
             text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
-            {"qid": q.id, "tid": t2.id}
+            {"qid": q.id, "tid": t2.id},
         ).first()
         assert link is not None
 
         # 4. Delete tag_two
-        resp_del = client.delete(
-            f"/api/questions/tags/{t2.id}",
-            headers=auth_headers
-        )
+        resp_del = client.delete(f"/api/questions/tags/{t2.id}", headers=auth_headers)
         assert resp_del.status_code == 200
 
         deleted_t2 = db.query(Tag).filter(Tag.id == t2.id).first()

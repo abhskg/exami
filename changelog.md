@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Question Bank Analytics Dashboard**: Integrated a comprehensive, highly aesthetic analytics panel at the top of the Questions Bank view.
+  - Left Column: Topic-specific stats showing Easy, Medium, and Hard question counts, a horizontal segmented/stacked progress bar showing the difficulty distribution, and a concept/tag frequency breakdown.
+  - Right Column: Global subject/topic breakdown showing the total question counts across all of the user's topics, highlighting the currently active topic.
+  - `backend/app/schemas/question.py` — added `TagAnalytics`, `TopicAnalytics`, and `QuestionAnalyticsResponse` schemas.
+  - `backend/app/api/questions.py` — added `GET /api/questions/analytics` endpoint supporting topic-specific and user-wide global analytics.
+  - `frontend/src/components/KnowledgeCatalog.tsx` — added types, state variables, and `fetchAnalytics` method to fetch analytics from the backend on load and when questions are created, updated, or deleted, and rendered the dashboard widgets before the filter section.
+  - `backend/app/tests/test_question_bank.py` — added integration tests verifying the `/analytics` endpoint functionality for both topic-filtered and global requests.
+
 - **Topic Rename & Delete from Sidebar**: Users can now edit and delete topics directly from the sidebar without leaving any page. Each topic row reveals a **✏️ pencil** (rename) and **🗑️ trash** (delete) icon button on hover. Clicking the pencil switches the row into an **inline rename editor** (Enter to save, Escape to cancel, duplicate-name guard included). Clicking the trash opens a **glassmorphic confirmation modal** that warns the user all associated data (documents, embeddings, questions, sessions, tags) will be permanently removed before proceeding.
   - `backend/app/schemas/topic.py` — added `TopicUpdate` schema with optional `name` and `description` fields.
   - `backend/app/api/topics.py` — added `PUT /api/topics/{id}` (rename with uniqueness check) and `DELETE /api/topics/{id}` (full cascade delete via SQLAlchemy `delete-orphan`).

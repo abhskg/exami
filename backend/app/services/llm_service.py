@@ -202,7 +202,9 @@ def embed_text(texts: list[str]) -> list[list[float]]:
                 response = client.models.embed_content(
                     model=model_name,
                     contents=texts,
-                    config=types.EmbedContentConfig(output_dimensionality=settings.EMBEDDING_DIMENSION),
+                    config=types.EmbedContentConfig(
+                        output_dimensionality=settings.EMBEDDING_DIMENSION
+                    ),
                 )
                 embeddings = [emb.values for emb in response.embeddings]
             elif provider in ("openai", "lmstudio"):

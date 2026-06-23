@@ -135,4 +135,3 @@ async def health_check():
         "embedding_provider": settings.EMBEDDING_PROVIDER,
         "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
     }
-
