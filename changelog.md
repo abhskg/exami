@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Centralized Logging Setup**: Added a centralized, structured logging setup using `logging.config.dictConfig` in `backend/app/core/logging_config.py`. Standardized console formats and silenced verbose logs from external packages (`sqlalchemy.engine`, `uvicorn.access`, etc.).
+- **LOG_LEVEL Configuration**: Added a new configuration parameter `LOG_LEVEL` (default: "INFO") in settings (`app/core/config.py` and `.env` / `.env.example`).
+- **HTTP Request Logging Middleware**: Implemented an ASGI middleware in `app/main.py` that intercepts all incoming requests to log method, path, query arguments, client host, duration, and status code.
+- **Global Unhandled Exception Handler**: Embedded robust error handling in the middleware to catch all unhandled exceptions, log the stack trace using `logger.exception`, and return a clean 500 JSONResponse (`{"detail": "An unexpected error occurred. Please try again later."}`).
+- **Client Error Exception Tracking**: Registered exception handlers on FastAPI for `HTTPException` and `RequestValidationError` to track client-side failures at warning log levels.
+- **Endpoint Trace Instrumenting**: Instrumented API endpoints across `auth.py`, `topics.py`, `documents.py`, `exams.py`, and `questions.py` with structured info-level and warning-level log statements.
+- **Logging Integration Tests**: Added test cases in `backend/app/tests/test_logging_exception.py` verifying request intercepting, unhandled exception catching, and HTTP validation/exception warnings.
 - **Raw Text Ingestion Endpoint**: Added `POST /api/documents/raw-text` to ingest raw pasted text directly, save it to a `.txt` file, and process it in the background using the existing chunking/embedding pipeline.
 - **Web Search Parser Ingestion Endpoint**: Added `POST /api/documents/web-search` to simulate parser agents by generating a mock parsed text corpus from syllabus requirements and target search topics.
 - **Ingestion Integration Tests**: Added backend tests for both raw text paste and web search scraping in `backend/app/tests/test_ingestion.py`.

@@ -20,6 +20,7 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
     *   *Practice Mode*: Provides instant explanations and correction feedback as you complete each question.
     *   *Timed Mode*: Simulates standard test environments. Enforces hard countdown limits, locks answers, and hides explanation analytics until the exam is fully completed.
 *   **📊 Performance Heatmaps**: Deep insights mapped onto a customizable concept-tag hierarchy. Visualize weak points, score distribution, and overall preparation status.
+*   **🛡️ Centralized Logging & Error Resilience**: Structured console logger format matching `LOG_LEVEL` environment parameters. Centralized request intercepting middleware logs request parameters (method, path, client IP, status, duration) and catches all unhandled routing exceptions to log stack-traces and output clean 500 JSON responses.
 
 ---
 
