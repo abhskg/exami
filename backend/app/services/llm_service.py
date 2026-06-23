@@ -249,3 +249,135 @@ def embed_text(texts: list[str]) -> list[list[float]]:
                         for idx in range(len(texts))
                     ]
                 raise e
+
+
+def generate_search_grounding(query: str, syllabus: str) -> Optional[str]:
+    """
+    Use Gemini Search Grounding (Google Search tool) to research a topic.
+    Returns markdown text if successful, or None if provider is not Gemini
+    or if the call fails / key is missing.
+    """
+    provider = settings.LLM_PROVIDER.lower().strip()
+    has_gemini_key = settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your-gemini-api-key-here"
+
+    if provider != "gemini" or not has_gemini_key or settings.APP_ENV == "test":
+        return None
+
+    try:
+        logger.info(f"Using Gemini Google Search grounding for topic: '{query}'")
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        model_name = settings.LLM_MODEL or "gemini-2.5-flash"
+
+        prompt = f"""You are a research agent. Perform Google Search as needed to get up-to-date and accurate details.
+Write a detailed, informative summary/explanation of the following topic:
+Topic: {query}
+Syllabus context: {syllabus}
+
+Structure the explanation clearly with headings, explanations, and code or examples if relevant.
+Format the output strictly as clear, clean Markdown text. Do not return conversational prefixes or postfaces.
+"""
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
+        )
+        if response.text:
+            return response.text.strip()
+    except Exception as e:
+        logger.error(f"Gemini search grounding failed for '{query}': {e}")
+
+    return None
+
+
+def synthesize_search_results(title: str, syllabus: str, query_data: dict[str, str]) -> str:
+    """
+    Synthesize raw search results into a clean, comprehensive study guide.
+    """
+    provider = settings.LLM_PROVIDER.lower().strip()
+    is_mock = (
+        (
+            provider == "gemini"
+            and (
+                not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here"
+            )
+        )
+        or (provider == "openai" and not settings.OPENAI_API_KEY)
+        or settings.APP_ENV == "test"
+    )
+
+    # Construct the synthesis prompt
+    sources_text = ""
+    for query, text in query_data.items():
+        sources_text += f"\n--- Query Topic: {query} ---\n{text[:5000]}\n"
+
+    prompt = f"""You are an expert curriculum designer and educator.
+Your task is to synthesize the retrieved raw web search data into a comprehensive, cohesive, and detailed study guide/textbook chapter.
+
+Title: {title}
+Syllabus / Learning Objectives:
+{syllabus}
+
+Retrieved Source Material:
+{sources_text}
+
+Instructions:
+1. Synthesize the source material into a detailed explanation of the topics.
+2. Structure the document clearly using Markdown headings (e.g., # for Title, ## for sections, ### for sub-sections).
+3. Provide formal definitions, theoretical frameworks, step-by-step explanations, code examples (if applicable), and real-world applications.
+4. Ensure the content directly addresses the learning objectives listed in the syllabus.
+5. Maintain a professional, educational, and clean tone.
+6. Return ONLY the final compiled markdown document. Do not include conversational prefaces or postfaces.
+"""
+
+    if is_mock:
+        logger.warning("Using mock synthesis for web search.")
+        topics_list = "\n".join(f"- **{q}**: Explanations and theoretical context for {q}." for q in query_data.keys())
+        return f"""# {title} (Mock Synthesized Guide)
+
+## Introduction
+This is a mock study guide compiled for the syllabus: {syllabus}.
+
+## Key Topics
+{topics_list}
+
+## Conclusion
+This concludes the mock syllabus study guide.
+"""
+
+    try:
+        if provider == "gemini":
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            model_name = settings.LLM_MODEL or "gemini-3.1-flash-lite"
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            return response.text.strip()
+        elif provider in ("openai", "lmstudio"):
+            client = get_llm_client()
+            model_name = settings.LLM_MODEL
+            if not model_name:
+                model_name = "gpt-4o-mini" if provider == "openai" else "local-model"
+
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional educational compiler. Output clean markdown content only."
+                    },
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}")
+    except Exception as e:
+        logger.error(f"Failed to synthesize search results: {e}")
+        # Fallback to simple concatenation if LLM fails
+        fallback_content = f"# {title}\n\n## Syllabus\n{syllabus}\n\n"
+        for q, text in query_data.items():
+            fallback_content += f"## Topic: {q}\n\n{text[:3000]}\n\n"
+        return fallback_content

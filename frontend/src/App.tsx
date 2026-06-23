@@ -2323,9 +2323,9 @@ function App() {
                         marginBottom: '24px',
                       }}
                     >
-                      <strong>Agent Parse Simulation Note:</strong> Web search parsing is simulated.
-                      Clicking submit will automatically run web search agents (simulated corpus
-                      assembly) and ingest the results.
+                      <strong>Web Search Agent Run:</strong> Clicking submit will automatically launch
+                      web search agents to query Wikipedia and scrape web resources for each target topic.
+                      The agent will synthesize a cohesive study guide for your syllabus.
                     </div>
 
                     {/* Progress bar during uploads */}

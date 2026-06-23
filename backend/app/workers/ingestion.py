@@ -179,3 +179,149 @@ def process_document_task(
     finally:
         if not is_external_db:
             db.close()
+
+
+def process_web_search_task(
+    job_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user_id: uuid.UUID,
+    title: str,
+    syllabus: str,
+    topics: str,
+    db=None,
+) -> None:
+    """
+    Background worker job for running web search parser agents:
+    1. Parses topics into individual target queries.
+    2. Searches Wikipedia/scrapes DuckDuckGo search results for each topic.
+    3. Synthesizes scraped documents using LLM.
+    4. Writes synthesized text to disk.
+    5. Segments compiled guide into semantic chunks.
+    6. Calls Embeddings API and saves to database.
+    """
+    is_external_db = db is not None
+    if not is_external_db:
+        db = SessionLocal()
+
+    try:
+        # Fetch Job and Document
+        job = db.query(Job).filter(Job.id == job_id).first()
+        doc = db.query(Document).filter(Document.id == document_id).first()
+
+        if not job or not doc:
+            logger.error(f"Job {job_id} or Document {document_id} not found in DB.")
+            return
+
+        job.status = "running"
+        job.progress = 10
+        doc.status = "parsing"
+        db.commit()
+
+        # Parse topics into separate query targets
+        queries = []
+        if "," in topics:
+            queries = [q.strip() for q in topics.split(",") if q.strip()]
+        elif "\n" in topics:
+            queries = [q.strip() for q in topics.split("\n") if q.strip()]
+        else:
+            queries = [topics.strip()]
+
+        # Fallback to title if queries is empty
+        if not queries or all(not q for q in queries):
+            queries = [title]
+
+        # Limit to top 5 queries to avoid overly long executions
+        queries = queries[:5]
+        total_queries = len(queries)
+
+        from app.services.search_service import research_topic
+        from app.services.llm_service import synthesize_search_results
+
+        query_data = {}
+        for idx, q in enumerate(queries):
+            # Update progress during scraping (from 10% to 60%)
+            percent = int(10 + (idx / total_queries) * 50)
+            job.progress = percent
+            job.message = f"Web scraping for topic: '{q}'..."
+            db.commit()
+
+            logger.info(f"Researching topic query '{q}' ({idx+1}/{total_queries}) for job {job_id}")
+            text_result = research_topic(q, syllabus)
+            if text_result:
+                query_data[q] = text_result
+
+        # Synthesize into unified guide
+        job.progress = 65
+        job.message = "Synthesizing research results into study guide..."
+        db.commit()
+
+        synthesized_guide = synthesize_search_results(title, syllabus, query_data)
+
+        # Ensure directory exists and write compiled guide to storage path
+        job.progress = 75
+        job.message = "Writing compiled document to disk..."
+        db.commit()
+
+        user_upload_dir = os.path.dirname(doc.storage_path)
+        os.makedirs(user_upload_dir, exist_ok=True)
+        with open(doc.storage_path, "w", encoding="utf-8") as f:
+            f.write(synthesized_guide)
+
+        # Segment into chunks
+        job.progress = 80
+        job.message = "Chunking synthesized document..."
+        db.commit()
+
+        chunks = chunk_text(synthesized_guide)
+        if not chunks:
+            raise ValueError("Synthesized document yielded zero text chunks.")
+
+        # Generate embeddings
+        job.progress = 85
+        job.message = "Generating vector embeddings..."
+        db.commit()
+
+        embeddings = get_embeddings(chunks)
+
+        # Save chunks and vectors
+        job.progress = 95
+        job.message = "Saving segments to database..."
+        db.commit()
+
+        for idx, (chunk_text_content, emb_vector) in enumerate(zip(chunks, embeddings)):
+            chunk = ContentChunk(
+                document_id=doc.id,
+                user_id=user_id,
+                topic_id=doc.topic_id,
+                chunk_text=chunk_text_content,
+                embedding=emb_vector,
+                chunk_index=idx,
+            )
+            db.add(chunk)
+
+        doc.status = "parsed"
+        job.status = "completed"
+        job.progress = 100
+        job.message = "Completed compiling and vectorizing."
+        db.commit()
+        logger.info(f"Successfully processed web search document {document_id} (job {job_id}).")
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Exception encountered during web search processing (job {job_id}): {e}")
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if job:
+                job.status = "failed"
+                job.message = str(e)
+                job.progress = 100
+            if doc:
+                doc.status = "failed"
+            db.commit()
+        except Exception as db_err:
+            logger.error(f"Failed to write error state to database: {db_err}")
+    finally:
+        if not is_external_db:
+            db.close()
+

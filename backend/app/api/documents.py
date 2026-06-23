@@ -31,7 +31,7 @@ from app.schemas.document import (
     DocumentUpdateRequest,
 )
 from app.services.llm_service import embed_text
-from app.workers.ingestion import process_document_task
+from app.workers.ingestion import process_document_task, process_web_search_task
 
 logger = logging.getLogger(__name__)
 
@@ -279,11 +279,11 @@ async def ingest_web_search(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Ingest a document by simulating web search agent scraping, save it to the local filesystem as a .txt file,
-    create metadata entries, and trigger background parsing/ingestion.
+    Ingest a document by running the web search and parser agent, which searches Wikipedia
+    and scrapes results from DuckDuckGo, then compiles the study guide asynchronously in a background job.
     """
     logger.info(
-        f"User {current_user.email} (ID: {current_user.id}) triggering simulated web search parser: '{req.title}' for topic {req.topic_id}"
+        f"User {current_user.email} (ID: {current_user.id}) triggering web search agent: '{req.title}' for topic {req.topic_id}"
     )
 
     # 1. Enforce isolation and topic scope
@@ -299,47 +299,14 @@ async def ingest_web_search(
             detail="Topic not found or access denied.",
         )
 
-    # 2. Build mock web parser corpus
-    web_parsed_content = f"""Web Search Parser Agent (Placeholder Ingestion)
-Document Title: {req.title}
-Syllabus Requirements:
-{req.syllabus}
-
-Target Search Topics:
-{req.topics}
-
----
-Simulated Parser Agent Run:
-- Initialized web agent search query for syllabus: "{req.title}"
-- Parsed online resources (Wikipedia, official docs, textbooks) for the following topic list:
-  {req.topics}
-- Scraped relevant definitions, diagrams outlines, and detailed theoretical frameworks.
-- Cleaned markdown text corpus assembled successfully for embedding.
-- This is a functional placeholder corpus representing scraped content from web resources.
-"""
-
-    content_bytes = web_parsed_content.encode("utf-8")
-    if len(content_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
-        logger.warning(
-            f"Web search ingestion rejected: Corpus size {len(content_bytes)} bytes exceeds {settings.MAX_FILE_SIZE_MB}MB for topic {req.topic_id}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Content size exceeds the maximum limit of {settings.MAX_FILE_SIZE_MB}MB.",
-        )
-
-    # 3. Generate metadata & path
+    # 2. Generate metadata & target path
     document_id = uuid.uuid4()
     user_upload_dir = os.path.join(settings.UPLOADS_DIR, str(current_user.id))
     os.makedirs(user_upload_dir, exist_ok=True)
 
     storage_path = os.path.join(user_upload_dir, f"{document_id}.txt")
 
-    # 4. Write content to disk
-    with open(storage_path, "w", encoding="utf-8") as f:
-        f.write(web_parsed_content)
-
-    # 5. Database entries
+    # 3. Database entries in pending state
     doc_record = Document(
         id=document_id,
         user_id=current_user.id,
@@ -364,14 +331,22 @@ Simulated Parser Agent Run:
     db.refresh(job_record)
 
     logger.info(
-        f"Web scan simulated document created. Document ID: {document_id}. Registered background ingestion Job ID: {job_record.id}"
+        f"Web search agent document entry created. Document ID: {document_id}. Registered background Job ID: {job_record.id}"
     )
 
-    # 6. Register background worker task
-    background_tasks.add_task(process_document_task, job_record.id, doc_record.id, current_user.id)
+    # 4. Register background web search worker task
+    background_tasks.add_task(
+        process_web_search_task,
+        job_record.id,
+        doc_record.id,
+        current_user.id,
+        req.title,
+        req.syllabus,
+        req.topics,
+    )
 
     return {
-        "message": "Web search simulated successfully. Agent corpus created and queued.",
+        "message": "Web search agent started successfully. Processing in background.",
         "document": doc_record,
         "job_id": job_record.id,
     }

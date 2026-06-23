@@ -8,7 +8,7 @@ from app.models.content_chunk import ContentChunk
 from app.models.document import Document
 from app.models.job import Job
 from app.models.topic import Topic
-from app.workers.ingestion import process_document_task
+from app.workers.ingestion import process_document_task, process_web_search_task
 
 
 def get_auth_headers(client):
@@ -243,18 +243,27 @@ def test_web_search_ingestion(client, db):
     assert doc_in_db is not None
     assert doc_in_db.status == "pending"
     assert doc_in_db.source_type == "web_scan"
-    assert os.path.exists(doc_in_db.storage_path)
+    assert not os.path.exists(doc_in_db.storage_path)
 
-    # Run the worker synchronously
-    process_document_task(job_id, document_id, doc_in_db.user_id, db=db)
+    # Run the worker synchronously using the web search parser agent task
+    process_web_search_task(
+        job_id,
+        document_id,
+        doc_in_db.user_id,
+        "Web search sample",
+        "List of sorting algorithms",
+        "QuickSort, MergeSort, BubbleSort",
+        db=db,
+    )
 
     db.expire_all()
     assert doc_in_db.status == "parsed"
+    assert os.path.exists(doc_in_db.storage_path)
 
-    # Verify file content
+    # Verify synthesized file content
     with open(doc_in_db.storage_path, "r", encoding="utf-8") as f:
         file_text = f.read()
-        assert "Web Search Parser Agent" in file_text
+        assert len(file_text) > 100
         assert "QuickSort" in file_text
 
     # Cleanup file
