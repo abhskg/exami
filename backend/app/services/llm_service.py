@@ -1,14 +1,17 @@
-import os
 import json
-import time
 import logging
+import os
+import time
 from typing import Optional
-from openai import OpenAI
+
 from google import genai
 from google.genai import types
+from openai import OpenAI
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
 
 def pad_or_truncate(vector: list[float], target_dim: int) -> list[float]:
     """
@@ -22,27 +25,24 @@ def pad_or_truncate(vector: list[float], target_dim: int) -> list[float]:
         return vector + [0.0] * (target_dim - current_dim)
     return vector
 
+
 def get_llm_client() -> OpenAI:
     """Initialize OpenAI compatible client based on provider settings."""
     if settings.LLM_PROVIDER == "lmstudio":
-        return OpenAI(
-            base_url=settings.LMSTUDIO_BASE_URL,
-            api_key="lm-studio"
-        )
+        return OpenAI(base_url=settings.LMSTUDIO_BASE_URL, api_key="lm-studio")
     else:  # openai
         return OpenAI(api_key=settings.OPENAI_API_KEY)
+
 
 def get_embedding_client() -> OpenAI:
     """Initialize OpenAI compatible client for embeddings based on provider settings."""
     if settings.EMBEDDING_PROVIDER == "lmstudio":
         base_url = settings.EMBEDDING_BASE_URL or settings.LMSTUDIO_BASE_URL
-        return OpenAI(
-            base_url=base_url,
-            api_key="lm-studio"
-        )
+        return OpenAI(base_url=base_url, api_key="lm-studio")
     else:  # openai
         api_key = settings.EMBEDDING_API_KEY or settings.OPENAI_API_KEY
         return OpenAI(api_key=api_key)
+
 
 def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
     """
@@ -51,13 +51,20 @@ def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
     """
     provider = settings.LLM_PROVIDER.lower().strip()
     is_mock = (
-        (provider == "gemini" and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here"))
+        (
+            provider == "gemini"
+            and (
+                not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here"
+            )
+        )
         or (provider == "openai" and not settings.OPENAI_API_KEY)
         or settings.APP_ENV == "test"
     )
 
     if is_mock:
-        logger.warning(f"Using mock MCQ generation (provider={provider}, environment={settings.APP_ENV}).")
+        logger.warning(
+            f"Using mock MCQ generation (provider={provider}, environment={settings.APP_ENV})."
+        )
         return [
             {
                 "question_text": f"Mock question generated in test/mock environment ({provider})?",
@@ -107,11 +114,11 @@ def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
                                 "You are an expert exam question generator. You must output ONLY a valid JSON object "
                                 "conforming to the requested format. Do not write any explanations or markdown blocks "
                                 "outside the JSON."
-                            )
+                            ),
                         },
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt},
                     ],
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
                 raw = response.choices[0].message.content.strip()
             else:
@@ -128,7 +135,9 @@ def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
 
         except Exception as e:
             err_msg = str(e)
-            is_rate_limited = "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Rate limit" in err_msg
+            is_rate_limited = (
+                "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Rate limit" in err_msg
+            )
             if is_rate_limited and attempt < max_retries - 1:
                 logger.warning(
                     f"{provider.upper()} API rate limited. Retrying in {delay}s "
@@ -156,6 +165,7 @@ def generate_mcqs(prompt: str, count: int, difficulty: str) -> list[dict]:
                     ]
                 raise e
 
+
 def embed_text(texts: list[str]) -> list[list[float]]:
     """
     Unified embedding generator. Automatically aligns return dimensions with settings.EMBEDDING_DIMENSION (768).
@@ -163,13 +173,20 @@ def embed_text(texts: list[str]) -> list[list[float]]:
     provider = settings.EMBEDDING_PROVIDER.lower().strip()
     is_mock = (
         provider == "mock"
-        or (provider == "gemini" and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here"))
+        or (
+            provider == "gemini"
+            and (
+                not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your-gemini-api-key-here"
+            )
+        )
         or (provider == "openai" and not settings.OPENAI_API_KEY and not settings.EMBEDDING_API_KEY)
         or settings.APP_ENV == "test"
     )
 
     if is_mock:
-        logger.warning(f"Using mock embeddings (provider={provider}, environment={settings.APP_ENV}).")
+        logger.warning(
+            f"Using mock embeddings (provider={provider}, environment={settings.APP_ENV})."
+        )
         return [[0.1 * (idx % 10)] * settings.EMBEDDING_DIMENSION for idx in range(len(texts))]
 
     max_retries = 5
@@ -204,12 +221,16 @@ def embed_text(texts: list[str]) -> list[list[float]]:
                 raise ValueError(f"Unsupported embedding provider: {provider}")
 
             # Ensure all returned vectors strictly match settings.EMBEDDING_DIMENSION
-            aligned_embeddings = [pad_or_truncate(emb, settings.EMBEDDING_DIMENSION) for emb in embeddings]
+            aligned_embeddings = [
+                pad_or_truncate(emb, settings.EMBEDDING_DIMENSION) for emb in embeddings
+            ]
             return aligned_embeddings
 
         except Exception as e:
             err_msg = str(e)
-            is_rate_limited = "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Rate limit" in err_msg
+            is_rate_limited = (
+                "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Rate limit" in err_msg
+            )
             if is_rate_limited and attempt < max_retries - 1:
                 logger.warning(
                     f"Embedding API rate limited ({provider}). Retrying in {delay}s "
@@ -220,5 +241,8 @@ def embed_text(texts: list[str]) -> list[list[float]]:
             else:
                 logger.error(f"Embedding generation failed ({provider}): {e}")
                 if settings.APP_ENV == "local" or settings.DEBUG:
-                    return [[0.1 * (idx % 10)] * settings.EMBEDDING_DIMENSION for idx in range(len(texts))]
+                    return [
+                        [0.1 * (idx % 10)] * settings.EMBEDDING_DIMENSION
+                        for idx in range(len(texts))
+                    ]
                 raise e

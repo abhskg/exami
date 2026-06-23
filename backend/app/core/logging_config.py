@@ -1,6 +1,8 @@
 import logging.config
 import sys
+
 from app.core.config import settings
+
 
 def setup_logging() -> None:
     """
@@ -8,7 +10,7 @@ def setup_logging() -> None:
     Standardizes log formats and controls verbose logging from external libraries.
     """
     log_level = settings.LOG_LEVEL.upper()
-    
+
     # Configure logging
     logging_config = {
         "version": 1,

@@ -1,6 +1,8 @@
 from typing import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
 from app.core.config import settings
 
 # Initialize the SQLAlchemy engine (using psycopg2 driver via DATABASE_URL)
@@ -13,15 +15,13 @@ engine = create_engine(
 )
 
 # Create a configured "SessionLocal" class
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 # Create a Base class for SQLAlchemy models
 class Base(DeclarativeBase):
     pass
+
 
 # DB session dependency generator
 def get_db() -> Generator[Session, None, None]:

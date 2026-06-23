@@ -1,47 +1,27 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime
+
+from sqlalchemy import Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
+
 
 class User(Base):
     """
     SQLAlchemy model representing the users table.
     Enforces user isolation, with other database objects linking to users.id.
     """
+
     __tablename__ = "users"
 
-    id = Column(
-        UUID(as_uuid=True), 
-        primary_key=True, 
-        default=uuid.uuid4, 
-        nullable=False
-    )
-    email = Column(
-        String, 
-        unique=True, 
-        index=True, 
-        nullable=False
-    )
-    password_hash = Column(
-        String, 
-        nullable=False
-    )
-    display_name = Column(
-        String, 
-        nullable=True
-    )
-    created_at = Column(
-        DateTime, 
-        default=lambda: datetime.now(timezone.utc), 
-        nullable=False
-    )
-    plan_tier = Column(
-        String, 
-        default="free", 
-        nullable=False
-    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    display_name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    plan_tier = Column(String, default="free", nullable=False)
 
     # Relationships
     topics = relationship("Topic", back_populates="user", cascade="all, delete-orphan")

@@ -1,16 +1,17 @@
-from contextlib import asynccontextmanager
 import logging
 import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.api import api_router
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.api.api import api_router
 from app.core.logging_config import setup_logging
 
 # Initialize logging configuration
@@ -20,6 +21,7 @@ logger = logging.getLogger("app.main")
 
 # Import all models to ensure they are registered on the Base metadata
 import app.models
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,13 +35,15 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down FastAPI application...")
 
+
 app = FastAPI(
     title=f"{settings.APP_NAME} API",
     description="Local-first MVP for AI-assisted ingestion, parsing, tag management, and exam practice.",
     version="0.1.0",
     debug=settings.DEBUG,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -48,9 +52,9 @@ async def log_requests(request: Request, call_next):
     query_params = request.url.query
     full_path = f"{path}?{query_params}" if query_params else path
     client_host = request.client.host if request.client else "unknown"
-    
+
     logger.info(f"Incoming request: {request.method} {full_path} from {client_host}")
-    
+
     try:
         response = await call_next(request)
         duration = time.perf_counter() - start_time
@@ -67,8 +71,9 @@ async def log_requests(request: Request, call_next):
         )
         return JSONResponse(
             status_code=500,
-            content={"detail": "An unexpected error occurred. Please try again later."}
+            content={"detail": "An unexpected error occurred. Please try again later."},
         )
+
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -76,10 +81,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         f"HTTP exception on {request.method} {request.url.path}: "
         f"status_code={exc.status_code} detail={exc.detail}"
     )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -87,10 +90,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         f"Request validation failed on {request.method} {request.url.path}: "
         f"errors={exc.errors()}"
     )
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors()}
-    )
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -99,7 +100,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred. Please try again later."}
+        content={"detail": "An unexpected error occurred. Please try again later."},
     )
 
 
@@ -115,13 +116,15 @@ app.add_middleware(
 # Register endpoints under /api
 app.include_router(api_router, prefix="/api")
 
+
 @app.get("/")
 async def root():
     return {
         "message": f"Welcome to the {settings.APP_NAME} API",
         "status": "online",
-        "docs_url": "/docs"
+        "docs_url": "/docs",
     }
+
 
 @app.get("/health")
 async def health_check():
@@ -129,5 +132,5 @@ async def health_check():
         "status": "healthy",
         "environment": settings.APP_ENV,
         "llm_provider": settings.LLM_PROVIDER,
-        "embedding_provider": settings.EMBEDDING_PROVIDER
+        "embedding_provider": settings.EMBEDDING_PROVIDER,
     }

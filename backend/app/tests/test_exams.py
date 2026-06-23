@@ -7,20 +7,22 @@ Covers:
 - Security checks: hides correctness in timed sessions, exposes in practice
 - Completion checks: score calculation accuracy
 """
-import pytest
+
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from app.core.database import get_db, Base, engine
-from app.models.user import User
-from app.models.topic import Topic
-from app.models.question import Question, QuestionOption
-from app.models.exam import ExamSession, ExamResponse
-from app.core.security import get_password_hash, create_access_token
 from app.core.config import settings
+from app.core.database import Base, engine, get_db
+from app.core.security import create_access_token, get_password_hash
+from app.main import app
+from app.models.exam import ExamResponse, ExamSession
+from app.models.question import Question, QuestionOption
+from app.models.topic import Topic
+from app.models.user import User
 
 settings.APP_ENV = "test"
 
@@ -42,6 +44,7 @@ def db():
 def client(db):
     def override_get_db():
         yield db
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
@@ -96,10 +99,10 @@ def seeded_questions(db, test_user, test_topic):
                 question_id=q.id,
                 option_text=f"Option {chr(65+j)}",
                 is_correct=(j == 0),  # Option A is always correct
-                option_order=j
+                option_order=j,
             )
             db.add(opt)
-        
+
         questions.append(q)
     db.commit()
     for q in questions:
@@ -137,7 +140,9 @@ class TestExamEngineAPI:
             assert q["explanation"] is None
             assert len(q["options"]) == 4
 
-    def test_practice_mode_exposes_correctness_immediately(self, client, auth_headers, test_topic, seeded_questions, db):
+    def test_practice_mode_exposes_correctness_immediately(
+        self, client, auth_headers, test_topic, seeded_questions, db
+    ):
         """In practice mode, answer submission returns correctness and correct option ID immediately."""
         # Initialize session
         resp_session = client.post(
@@ -152,7 +157,7 @@ class TestExamEngineAPI:
         session_data = resp_session.json()
         session_id = session_data["id"]
         question = session_data["questions"][0]
-        
+
         # Get correct option ID
         db_q = db.query(Question).filter(Question.id == uuid.UUID(question["id"])).first()
         correct_opt = next(o for o in db_q.options if o.is_correct)
@@ -173,7 +178,9 @@ class TestExamEngineAPI:
         assert sub_data["is_correct"] is False
         assert sub_data["correct_option_id"] == str(correct_opt.id)
 
-    def test_timed_mode_hides_correctness(self, client, auth_headers, test_topic, seeded_questions, db):
+    def test_timed_mode_hides_correctness(
+        self, client, auth_headers, test_topic, seeded_questions, db
+    ):
         """In timed mode, answer submission hides correctness/answers."""
         resp_session = client.post(
             "/api/exams/sessions",
@@ -205,7 +212,9 @@ class TestExamEngineAPI:
         assert sub_data["is_correct"] is None
         assert sub_data["correct_option_id"] is None
 
-    def test_scoring_on_explicit_completion(self, client, auth_headers, test_topic, seeded_questions, db):
+    def test_scoring_on_explicit_completion(
+        self, client, auth_headers, test_topic, seeded_questions, db
+    ):
         """Completing an exam session computes scores correctly based on responses."""
         resp_session = client.post(
             "/api/exams/sessions",
@@ -289,7 +298,9 @@ class TestExamEngineAPI:
         db.refresh(session_record)
         assert session_record.status == "completed"
 
-    def test_results_endpoint_active_timed_fails(self, client, auth_headers, test_topic, seeded_questions):
+    def test_results_endpoint_active_timed_fails(
+        self, client, auth_headers, test_topic, seeded_questions
+    ):
         """GET /api/exams/sessions/{id}/results raises 400 for active timed session."""
         resp_session = client.post(
             "/api/exams/sessions",
@@ -308,14 +319,21 @@ class TestExamEngineAPI:
             headers=auth_headers,
         )
         assert resp_results.status_code == 400
-        assert "Cannot retrieve results for an active timed session" in resp_results.json()["detail"]
+        assert (
+            "Cannot retrieve results for an active timed session" in resp_results.json()["detail"]
+        )
 
     def test_results_endpoint_success(self, client, auth_headers, test_topic, seeded_questions, db):
         """GET /api/exams/sessions/{id}/results returns compiled stats and tag metrics."""
         # Let's add some tags to the seeded questions to verify tag performance aggregation
         from app.models.tag import Tag
+
         tag1 = Tag(user_id=seeded_questions[0].user_id, topic_id=test_topic.id, name="arrays")
-        tag2 = Tag(user_id=seeded_questions[0].user_id, topic_id=test_topic.id, name="linked lists")
+        tag2 = Tag(
+            user_id=seeded_questions[0].user_id,
+            topic_id=test_topic.id,
+            name="linked lists",
+        )
         db.add(tag1)
         db.add(tag2)
         db.flush()
@@ -338,7 +356,6 @@ class TestExamEngineAPI:
         )
         session_data = resp_session.json()
         session_id = session_data["id"]
-
 
         # Submit answers
         # seeded_questions[0]: Correct (Option A, id is opt_correct)
@@ -408,4 +425,3 @@ class TestExamEngineAPI:
         assert tag_perf["linked lists"]["incorrect_count"] == 1
         assert tag_perf["linked lists"]["skipped_count"] == 1
         assert tag_perf["linked lists"]["percentage"] == 0.0
-

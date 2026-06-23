@@ -37,7 +37,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
         body: JSON.stringify({
           email,
           password,
-          display_name: displayName || null
+          display_name: displayName || null,
         }),
       });
 
@@ -59,7 +59,10 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
       const loginData = await loginRes.json();
 
       if (!loginRes.ok) {
-        throw new Error(loginData.detail || 'Registration succeeded, but auto-login failed. Please sign in manually.');
+        throw new Error(
+          loginData.detail ||
+            'Registration succeeded, but auto-login failed. Please sign in manually.'
+        );
       }
 
       // Success: Save token to local storage and trigger success callback
@@ -76,44 +79,60 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
   return (
     <div className="fade-in" style={{ width: '100%' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', color: 'var(--text-primary)' }}>Create Account</h3>
+        <h3 style={{ fontSize: '1.5rem', marginBottom: '8px', color: 'var(--text-primary)' }}>
+          Create Account
+        </h3>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
           Join AI Prep or{' '}
           <a
             href="#"
-            onClick={(e) => { e.preventDefault(); onToggleMode(); }}
+            onClick={e => {
+              e.preventDefault();
+              onToggleMode();
+            }}
             style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 600 }}
           >
             sign in to your account
-          </a>.
+          </a>
+          .
         </p>
       </div>
 
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
-          borderRadius: '8px',
-          color: '#f87171',
-          fontSize: '0.85rem',
-          marginBottom: '20px'
-        }}>
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: '8px',
+            color: '#f87171',
+            fontSize: '0.85rem',
+            marginBottom: '20px',
+          }}
+        >
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
         {/* Name Field */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Full Name</label>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Full Name
+          </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <UserIcon size={18} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+            <UserIcon
+              size={18}
+              style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }}
+            />
             <input
               type="text"
               placeholder="John Doe"
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={e => setDisplayName(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px 12px 12px 40px',
@@ -121,7 +140,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
                 border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 color: 'var(--text-primary)',
-                outline: 'none'
+                outline: 'none',
               }}
             />
           </div>
@@ -129,15 +148,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
 
         {/* Email Field */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Email Address</label>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Email Address
+          </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Mail size={18} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+            <Mail
+              size={18}
+              style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }}
+            />
             <input
               type="email"
               required
               placeholder="name@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={e => setEmail(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px 12px 12px 40px',
@@ -145,7 +169,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
                 border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 color: 'var(--text-primary)',
-                outline: 'none'
+                outline: 'none',
               }}
             />
           </div>
@@ -153,15 +177,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
 
         {/* Password Field */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Password</label>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Password
+          </label>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Key size={18} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+            <Key
+              size={18}
+              style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }}
+            />
             <input
               type={showPassword ? 'text' : 'password'}
               required
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px 40px 12px 40px',
@@ -169,7 +198,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
                 border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 color: 'var(--text-primary)',
-                outline: 'none'
+                outline: 'none',
               }}
             />
             <button
@@ -183,7 +212,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
                 cursor: 'pointer',
                 color: 'var(--text-muted)',
                 display: 'flex',
-                alignItems: 'center'
+                alignItems: 'center',
               }}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -200,7 +229,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onToggleMode 
             padding: '14px',
             fontSize: '0.95rem',
             width: '100%',
-            marginTop: '8px'
+            marginTop: '8px',
           }}
         >
           {loading ? (

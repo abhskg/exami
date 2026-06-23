@@ -10,6 +10,7 @@ Task 5.2: Structured MCQ Generation Service
     with a structured JSON output schema, persists Question / QuestionOption /
     Tag rows inside a single DB transaction, and returns the saved objects.
 """
+
 import json
 import logging
 import uuid
@@ -30,11 +31,13 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _embed_query(query_text: str) -> list[float]:
     """
     Embed a single query string using centralized llm_service.
     """
     from app.services import llm_service
+
     embs = llm_service.embed_text([query_text])
     return embs[0]
 
@@ -44,12 +47,14 @@ def _call_llm_generate(prompt: str, count: int, difficulty: str) -> list[dict]:
     Call centralized llm_service to generate MCQs.
     """
     from app.services import llm_service
+
     return llm_service.generate_mcqs(prompt, count, difficulty)
 
 
 # ---------------------------------------------------------------------------
 # Task 5.1 — Vector Similarity Query
 # ---------------------------------------------------------------------------
+
 
 def get_similar_chunks(
     query_text: str,
@@ -83,9 +88,7 @@ def get_similar_chunks(
         )
         .order_by(
             # cosine distance ascending = most similar first
-            ContentChunk.embedding.op("<=>")(
-                text(f"'{vector_literal}'::vector")
-            )
+            ContentChunk.embedding.op("<=>")(text(f"'{vector_literal}'::vector"))
         )
         .limit(k)
         .all()
@@ -97,6 +100,7 @@ def get_similar_chunks(
 # ---------------------------------------------------------------------------
 # Task 5.2 — Structured MCQ Generation
 # ---------------------------------------------------------------------------
+
 
 def _resolve_or_create_tag(
     name: str,
@@ -262,17 +266,11 @@ OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
             tag = _resolve_or_create_tag(tag_name, topic_id, user_id, db)
             # Insert into association table only if not already linked
             exists = db.execute(
-                text(
-                    "SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"
-                ),
+                text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
                 {"qid": question.id, "tid": tag.id},
             ).first()
             if not exists:
-                db.execute(
-                    question_tags.insert().values(
-                        question_id=question.id, tag_id=tag.id
-                    )
-                )
+                db.execute(question_tags.insert().values(question_id=question.id, tag_id=tag.id))
 
         db.flush()
         saved_questions.append(question)
@@ -292,6 +290,7 @@ OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
 # ---------------------------------------------------------------------------
 # Tag listing helper (used by the frontend to populate tag filter chips)
 # ---------------------------------------------------------------------------
+
 
 def list_topic_tags(topic_id: UUID, user_id: UUID, db: Session) -> list[Tag]:
     """Return all tags belonging to a user's topic, ordered alphabetically."""

@@ -1,17 +1,21 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # ---------------------------------------------------------------------------
 # Request schemas
 # ---------------------------------------------------------------------------
 
+
 class GenerateQuestionsRequest(BaseModel):
     """Payload for POST /api/questions/generate."""
+
     topic_id: UUID
-    count: int = Field(default=5, ge=1, le=50, description="Number of questions to generate (1–50).")
+    count: int = Field(
+        default=5, ge=1, le=50, description="Number of questions to generate (1–50)."
+    )
     difficulty: str = Field(
         default="medium",
         pattern="^(easy|medium|hard|mixed)$",
@@ -26,6 +30,7 @@ class GenerateQuestionsRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
+
 
 class QuestionOptionResponse(BaseModel):
     id: UUID
@@ -59,10 +64,7 @@ class QuestionResponse(BaseModel):
         Pydantic never tries to coerce ORM Tag objects into strings directly.
         """
         resolved_tags = [tag.name for tag in question.tags]
-        resolved_options = [
-            QuestionOptionResponse.model_validate(opt)
-            for opt in question.options
-        ]
+        resolved_options = [QuestionOptionResponse.model_validate(opt) for opt in question.options]
         return cls(
             id=question.id,
             user_id=question.user_id,

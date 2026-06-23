@@ -1,16 +1,19 @@
 import uuid
 from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.models.user import User
-from app.models.topic import Topic
-from app.models.document import Document
+
 from app.models.content_chunk import ContentChunk
-from app.models.tag import Tag
+from app.models.document import Document
+from app.models.exam import ExamResponse, ExamSession
 from app.models.question import Question, QuestionOption
 from app.models.question_set import QuestionSet, QuestionSetItem
-from app.models.exam import ExamSession, ExamResponse
+from app.models.tag import Tag
+from app.models.topic import Topic
+from app.models.user import User
+
 
 def test_create_and_link_all_models(db: Session):
     # 1. Create a User
@@ -18,7 +21,7 @@ def test_create_and_link_all_models(db: Session):
         email="test_models@example.com",
         password_hash="hashed_pw_123",
         display_name="Test Model User",
-        plan_tier="free"
+        plan_tier="free",
     )
     db.add(user)
     db.commit()
@@ -29,7 +32,7 @@ def test_create_and_link_all_models(db: Session):
     topic = Topic(
         user_id=user.id,
         name="Computer Science 101",
-        description="Introduction to Algorithms"
+        description="Introduction to Algorithms",
     )
     db.add(topic)
     db.commit()
@@ -44,7 +47,7 @@ def test_create_and_link_all_models(db: Session):
         source_type="upload_pdf",
         original_filename="syllabus.pdf",
         storage_path="/local/path/syllabus.pdf",
-        status="parsed"
+        status="parsed",
     )
     db.add(doc)
     db.commit()
@@ -60,7 +63,7 @@ def test_create_and_link_all_models(db: Session):
         topic_id=topic.id,
         chunk_text="An algorithm is a finite sequence of rigorous instructions.",
         embedding=mock_embedding,
-        chunk_index=0
+        chunk_index=0,
     )
     db.add(chunk)
     db.commit()
@@ -70,10 +73,7 @@ def test_create_and_link_all_models(db: Session):
 
     # 5. Create Tags (with hierarchy)
     parent_tag = Tag(
-        user_id=user.id,
-        topic_id=topic.id,
-        name="Algorithms",
-        created_by="user_defined"
+        user_id=user.id, topic_id=topic.id, name="Algorithms", created_by="user_defined"
     )
     db.add(parent_tag)
     db.commit()
@@ -84,7 +84,7 @@ def test_create_and_link_all_models(db: Session):
         topic_id=topic.id,
         name="Sorting",
         parent_tag_id=parent_tag.id,
-        created_by="ai_generated"
+        created_by="ai_generated",
     )
     db.add(sub_tag)
     db.commit()
@@ -97,11 +97,7 @@ def test_create_and_link_all_models(db: Session):
     # Use nested transaction savepoint to avoid rolling back the outer transaction
     nested = db.begin_nested()
     try:
-        duplicate_tag = Tag(
-            user_id=user.id,
-            topic_id=topic.id,
-            name="Algorithms"
-        )
+        duplicate_tag = Tag(user_id=user.id, topic_id=topic.id, name="Algorithms")
         db.add(duplicate_tag)
         db.flush()
         pytest.fail("IntegrityError was not raised for duplicate tag unique constraint")
@@ -119,7 +115,7 @@ def test_create_and_link_all_models(db: Session):
         explanation="Merge sort recursively splits the array and merges it.",
         difficulty="medium",
         generated_by="ai",
-        is_active=True
+        is_active=True,
     )
     db.add(question)
     db.commit()
@@ -134,13 +130,13 @@ def test_create_and_link_all_models(db: Session):
         question_id=question.id,
         option_text="Bubble Sort",
         is_correct=False,
-        option_order=0
+        option_order=0,
     )
     option2 = QuestionOption(
         question_id=question.id,
         option_text="Merge Sort",
         is_correct=True,
-        option_order=1
+        option_order=1,
     )
     db.add_all([option1, option2])
     db.commit()
@@ -156,17 +152,13 @@ def test_create_and_link_all_models(db: Session):
         user_id=user.id,
         topic_id=topic.id,
         name="Midterm Practice Set",
-        generation_scope={"tags": ["Algorithms"]}
+        generation_scope={"tags": ["Algorithms"]},
     )
     db.add(qset)
     db.commit()
     db.refresh(qset)
 
-    qset_item = QuestionSetItem(
-        question_set_id=qset.id,
-        question_id=question.id,
-        position=1
-    )
+    qset_item = QuestionSetItem(question_set_id=qset.id, question_id=question.id, position=1)
     db.add(qset_item)
     db.commit()
     db.refresh(qset)
@@ -183,7 +175,7 @@ def test_create_and_link_all_models(db: Session):
         mode="timed",
         question_count=1,
         time_limit_seconds=1800,
-        status="in_progress"
+        status="in_progress",
     )
     db.add(exam_session)
     db.commit()
@@ -195,7 +187,7 @@ def test_create_and_link_all_models(db: Session):
         question_id=question.id,
         selected_option_id=option2.id,
         is_correct=True,
-        time_taken_seconds=45
+        time_taken_seconds=45,
     )
     db.add(exam_response)
     db.commit()

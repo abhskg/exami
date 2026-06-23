@@ -1,9 +1,26 @@
 # Makefile for AI-Powered Exam Preparation Portal
 
-.PHONY: help db-up db-down db-logs backend-setup backend-db-init backend-dev backend-test frontend-setup frontend-dev frontend-build setup-all dev clean
+.PHONY: help db-up db-down db-logs backend-setup backend-db-init backend-dev backend-test frontend-setup frontend-dev frontend-build setup-all dev clean format backend-format frontend-format
 
 # Default shell
 SHELL := /bin/sh
+
+# Platform-specific paths
+ifeq ($(OS),Windows_NT)
+    PYTHON  := .venv\Scripts\python
+    PIP     := .venv\Scripts\pip
+    UVICORN := .venv\Scripts\uvicorn
+    PYTEST  := .venv\Scripts\pytest
+    BLACK   := .venv\Scripts\black
+    ISORT   := .venv\Scripts\isort
+else
+    PYTHON  := .venv/bin/python
+    PIP     := .venv/bin/pip
+    UVICORN := .venv/bin/uvicorn
+    PYTEST  := .venv/bin/pytest
+    BLACK   := .venv/bin/black
+    ISORT   := .venv/bin/isort
+endif
 
 help:
 	@echo "======================================================================"
@@ -22,6 +39,7 @@ help:
 	@echo "  make frontend-dev       - Start Vite React development server"
 	@echo "  make frontend-build     - Build frontend production bundles"
 	@echo "  make dev                - Run backend and frontend concurrently"
+	@echo "  make format             - Format code (black/isort for backend, prettier for frontend)"
 	@echo "  make clean              - Clean temporary files, caches, and build folders"
 	@echo "======================================================================"
 
@@ -40,16 +58,16 @@ backend-setup:
 	@echo "Setting up Python virtual environment..."
 	cd backend && python -m venv .venv
 	@echo "To activate virtual environment manually, run: source backend/.venv/bin/activate (or backend\\.venv\\Scripts\\activate on Windows)"
-	cd backend && .venv/bin/pip install -r requirements.txt || cd backend && .venv\\Scripts\\pip install -r requirements.txt
+	cd backend && $(PIP) install -r requirements.txt
 
 backend-db-init:
-	cd backend && .venv/bin/python -m app.init_db || cd backend && .venv\\Scripts\\python -m app.init_db
+	cd backend && $(PYTHON) -m app.init_db
 
 backend-dev:
-	cd backend && .venv/bin/uvicorn app.main:app --reload || cd backend && .venv\\Scripts\\uvicorn app.main:app --reload
+	cd backend && $(UVICORN) app.main:app --reload
 
 backend-test:
-	cd backend && .venv/bin/pytest || cd backend && .venv\\Scripts\\pytest
+	cd backend && $(PYTEST)
 
 # Frontend commands
 frontend-setup:
@@ -72,6 +90,15 @@ dev:
 	@echo "Starting backend and frontend dev servers concurrently..."
 	@echo "Press Ctrl+C to stop both."
 	make -j2 backend-dev frontend-dev
+
+# Formatting commands
+backend-format:
+	cd backend && $(BLACK) . && $(ISORT) .
+
+frontend-format:
+	cd frontend && npm run format
+
+format: backend-format frontend-format
 
 clean:
 	@echo "Cleaning caches and temporary files..."

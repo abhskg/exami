@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
-  Settings, 
-  ChevronRight, 
-  Layers, 
-  CheckCircle2, 
-  Clock, 
-  TrendingUp, 
+import {
+  Settings,
+  ChevronRight,
+  Layers,
+  CheckCircle2,
+  Clock,
+  TrendingUp,
   Database,
   Upload,
   FolderOpen,
@@ -17,7 +17,7 @@ import {
   Sparkles,
   BookOpen,
   Tag,
-  X
+  X,
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
 
@@ -40,50 +40,55 @@ interface Document {
   ingested_at: string;
 }
 
-
-
 function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
   const [user, setUser] = useState<any | null>(() => {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   });
-  
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results'>('dashboard');
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results'>(
+    'dashboard'
+  );
   const [dbConnected, setDbConnected] = useState<boolean>(false);
-  
+
   // Active LLM & Embedding provider info from backend
   const [llmProvider, setLlmProvider] = useState<string>('gemini');
   const [embeddingProvider, setEmbeddingProvider] = useState<string>('gemini');
-  
+
   // Topics & Documents state
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
   const [isLoadingDocs, setIsLoadingDocs] = useState<boolean>(false);
-  
+
   // Create Topic Form state
   const [newTopicName, setNewTopicName] = useState<string>('');
   const [isCreatingTopic, setIsCreatingTopic] = useState<boolean>(false);
-  
+
   // Upload & Jobs state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string>('');
   const [jobMessage, setJobMessage] = useState<string>('');
-  
+
   // Ingestion Method & new forms state
-  const [ingestionMethod, setIngestionMethod] = useState<'upload' | 'raw_text' | 'web_search'>('upload');
+  const [ingestionMethod, setIngestionMethod] = useState<'upload' | 'raw_text' | 'web_search'>(
+    'upload'
+  );
   const [rawTextTitle, setRawTextTitle] = useState<string>('');
   const [rawTextContent, setRawTextContent] = useState<string>('');
   const [webSearchTitle, setWebSearchTitle] = useState<string>('');
   const [webSearchSyllabus, setWebSearchSyllabus] = useState<string>('');
   const [webSearchTopics, setWebSearchTopics] = useState<string>('');
-  
+
   // Toast Alert state
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
 
   // ---- Exam Config Panel state ----
   const [examCount, setExamCount] = useState<number>(5);
@@ -101,19 +106,24 @@ function App() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [examTimeRemaining, setExamTimeRemaining] = useState<number | null>(null);
   const [sessionCompletedResults, setSessionCompletedResults] = useState<any | null>(null);
-  const [practiceFeedback, setPracticeFeedback] = useState<{ [questionId: string]: { isCorrect: boolean; correctOptionId: string } }>({});
+  const [practiceFeedback, setPracticeFeedback] = useState<{
+    [questionId: string]: { isCorrect: boolean; correctOptionId: string };
+  }>({});
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
-  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<{ [questionId: string]: boolean }>({});
-  
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<{ [questionId: string]: boolean }>(
+    {}
+  );
+
   // ---- Results Analytics State (Phase 7) ----
   const [resultsMetrics, setResultsMetrics] = useState<any | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState<boolean>(false);
-  const [isGeneratingWeakAreaQuestions, setIsGeneratingWeakAreaQuestions] = useState<boolean>(false);
+  const [isGeneratingWeakAreaQuestions, setIsGeneratingWeakAreaQuestions] =
+    useState<boolean>(false);
   const [isGeneratingAllQuestions, setIsGeneratingAllQuestions] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<any>(null);
-  
+
   const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
   // Show toast notification helper
@@ -150,13 +160,13 @@ function App() {
     try {
       const res = await fetch(`${apiUrl}/api/topics/`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
         setTopics(data);
-        
+
         // Auto-provision default topic if list is empty
         if (data.length === 0) {
           await createDefaultTopic();
@@ -173,8 +183,8 @@ function App() {
         handleLogout();
       }
     } catch (err) {
-      console.error("Error fetching topics:", err);
-      showToast("Failed to load topics from database.", "error");
+      console.error('Error fetching topics:', err);
+      showToast('Failed to load topics from database.', 'error');
     } finally {
       setIsLoadingTopics(false);
     }
@@ -187,21 +197,21 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: "DSA & System Design",
-          description: "Default topic domain for algorithms, data structures, and architecture."
-        })
+          name: 'DSA & System Design',
+          description: 'Default topic domain for algorithms, data structures, and architecture.',
+        }),
       });
       if (res.ok) {
         const defaultTopic = await res.json();
         setTopics([defaultTopic]);
         setSelectedTopic(defaultTopic);
-        showToast("Auto-provisioned default Topic.", "success");
+        showToast('Auto-provisioned default Topic.', 'success');
       }
     } catch (err) {
-      console.error("Error creating default topic:", err);
+      console.error('Error creating default topic:', err);
     }
   };
 
@@ -209,34 +219,34 @@ function App() {
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTopicName.trim() || !token) return;
-    
+
     setIsCreatingTopic(true);
     try {
       const res = await fetch(`${apiUrl}/api/topics/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: newTopicName.trim(),
-          description: "Custom study topic domain."
-        })
+          description: 'Custom study topic domain.',
+        }),
       });
-      
+
       const data = await res.json();
       if (res.ok) {
-        showToast(`Topic "${newTopicName}" created successfully!`, "success");
+        showToast(`Topic "${newTopicName}" created successfully!`, 'success');
         setNewTopicName('');
         // Refresh topics list and select the new one
         await fetchTopics();
         setSelectedTopic(data);
       } else {
-        showToast(data.detail || "Failed to create topic.", "error");
+        showToast(data.detail || 'Failed to create topic.', 'error');
       }
     } catch (err) {
-      console.error("Error creating topic:", err);
-      showToast("Network error creating topic.", "error");
+      console.error('Error creating topic:', err);
+      showToast('Network error creating topic.', 'error');
     } finally {
       setIsCreatingTopic(false);
     }
@@ -249,15 +259,15 @@ function App() {
     try {
       const res = await fetch(`${apiUrl}/api/documents/?topic_id=${topicId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
         setDocuments(data);
       }
     } catch (err) {
-      console.error("Error fetching documents:", err);
+      console.error('Error fetching documents:', err);
     } finally {
       setIsLoadingDocs(false);
     }
@@ -286,11 +296,11 @@ function App() {
   const validateAndSetFile = (file: File) => {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     if (!['.pdf', '.txt', '.md'].includes(ext)) {
-      showToast("Unsupported file type. Please upload a PDF, TXT or MD document.", "error");
+      showToast('Unsupported file type. Please upload a PDF, TXT or MD document.', 'error');
       return;
     }
     if (file.size > 15 * 1024 * 1024) {
-      showToast("File size exceeds 15MB limit.", "error");
+      showToast('File size exceeds 15MB limit.', 'error');
       return;
     }
     setSelectedFile(file);
@@ -299,38 +309,38 @@ function App() {
   // 7. Trigger Upload & Ingestion Job
   const handleIngestFile = async () => {
     if (!selectedFile || !selectedTopic || !token) return;
-    
+
     setUploading(true);
     setJobProgress(0);
     setJobStatus('uploading');
     setJobMessage('Uploading file to server...');
-    
+
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('topic_id', selectedTopic.id);
-    
+
     try {
       const res = await fetch(`${apiUrl}/api/documents/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: formData
+        body: formData,
       });
-      
+
       const data = await res.json();
       if (res.status === 202) {
         // Ingestion started successfully, start polling job
         const jobId = data.job_id;
-        showToast("Ingestion job started. Processing in background...", "info");
+        showToast('Ingestion job started. Processing in background...', 'info');
         pollJobStatus(jobId);
       } else {
-        showToast(data.detail || "Failed to upload document.", "error");
+        showToast(data.detail || 'Failed to upload document.', 'error');
         setUploading(false);
       }
     } catch (err) {
-      console.error("Upload error:", err);
-      showToast("Network error uploading document.", "error");
+      console.error('Upload error:', err);
+      showToast('Network error uploading document.', 'error');
       setUploading(false);
     }
   };
@@ -338,83 +348,90 @@ function App() {
   // 7b. Trigger Raw Text Ingestion Job
   const handleIngestRawText = async () => {
     if (!rawTextTitle.trim() || !rawTextContent.trim() || !selectedTopic || !token) return;
-    
+
     setUploading(true);
     setJobProgress(0);
     setJobStatus('sending');
     setJobMessage('Sending text content to server...');
-    
+
     try {
       const res = await fetch(`${apiUrl}/api/documents/raw-text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
           title: rawTextTitle.trim(),
-          content: rawTextContent.trim()
-        })
+          content: rawTextContent.trim(),
+        }),
       });
-      
+
       const data = await res.json();
       if (res.status === 202) {
         const jobId = data.job_id;
-        showToast("Raw text ingestion started. Processing in background...", "info");
+        showToast('Raw text ingestion started. Processing in background...', 'info');
         setRawTextTitle('');
         setRawTextContent('');
         pollJobStatus(jobId);
       } else {
-        showToast(data.detail || "Failed to ingest raw text.", "error");
+        showToast(data.detail || 'Failed to ingest raw text.', 'error');
         setUploading(false);
       }
     } catch (err) {
-      console.error("Raw text ingest error:", err);
-      showToast("Network error ingesting raw text.", "error");
+      console.error('Raw text ingest error:', err);
+      showToast('Network error ingesting raw text.', 'error');
       setUploading(false);
     }
   };
 
   // 7c. Trigger Web Search Ingestion Job
   const handleIngestWebSearch = async () => {
-    if (!webSearchTitle.trim() || !webSearchSyllabus.trim() || !webSearchTopics.trim() || !selectedTopic || !token) return;
-    
+    if (
+      !webSearchTitle.trim() ||
+      !webSearchSyllabus.trim() ||
+      !webSearchTopics.trim() ||
+      !selectedTopic ||
+      !token
+    )
+      return;
+
     setUploading(true);
     setJobProgress(0);
     setJobStatus('searching');
     setJobMessage('Triggering web search parser agents...');
-    
+
     try {
       const res = await fetch(`${apiUrl}/api/documents/web-search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
           title: webSearchTitle.trim(),
           syllabus: webSearchSyllabus.trim(),
-          topics: webSearchTopics.trim()
-        })
+          topics: webSearchTopics.trim(),
+        }),
       });
-      
+
       const data = await res.json();
       if (res.status === 202) {
         const jobId = data.job_id;
-        showToast("Simulated web parser run started. Processing in background...", "info");
+        showToast('Simulated web parser run started. Processing in background...', 'info');
         setWebSearchTitle('');
         setWebSearchSyllabus('');
         setWebSearchTopics('');
         pollJobStatus(jobId);
       } else {
-        showToast(data.detail || "Failed to trigger web search.", "error");
+        showToast(data.detail || 'Failed to trigger web search.', 'error');
         setUploading(false);
       }
     } catch (err) {
-      console.error("Web search ingest error:", err);
-      showToast("Network error triggering web search.", "error");
+      console.error('Web search ingest error:', err);
+      showToast('Network error triggering web search.', 'error');
       setUploading(false);
     }
   };
@@ -422,42 +439,45 @@ function App() {
   // 8. Poll Background Job Progress
   const pollJobStatus = (jobId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    
+
     pollIntervalRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${apiUrl}/api/jobs/${jobId}`, {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
         if (res.ok) {
           const job = await res.json();
           setJobProgress(job.progress);
           setJobStatus(job.status);
-          
+
           if (job.status === 'completed') {
             clearInterval(pollIntervalRef.current);
             setUploading(false);
             setSelectedFile(null);
-            showToast("Document ingested, chunked, and vectorized successfully!", "success");
+            showToast('Document ingested, chunked, and vectorized successfully!', 'success');
             fetchDocuments(selectedTopic!.id);
           } else if (job.status === 'failed') {
             clearInterval(pollIntervalRef.current);
             setUploading(false);
             setJobMessage(job.message || 'Processing failed.');
-            showToast(job.message || "Document processing failed.", "error");
+            showToast(job.message || 'Document processing failed.', 'error');
             fetchDocuments(selectedTopic!.id);
           } else {
             // Update message based on progress
-            if (job.progress < 30) setJobMessage("Parsing document structures...");
-            else if (job.progress < 50) setJobMessage("Extracting text contents...");
-            else if (job.progress < 70) setJobMessage("Partitioning semantic chunks...");
-            else if (job.progress < 90) setJobMessage(`Generating vector embeddings (${embeddingProvider.toUpperCase()} API)...`);
-            else setJobMessage("Writing segments to pgvector database...");
+            if (job.progress < 30) setJobMessage('Parsing document structures...');
+            else if (job.progress < 50) setJobMessage('Extracting text contents...');
+            else if (job.progress < 70) setJobMessage('Partitioning semantic chunks...');
+            else if (job.progress < 90)
+              setJobMessage(
+                `Generating vector embeddings (${embeddingProvider.toUpperCase()} API)...`
+              );
+            else setJobMessage('Writing segments to pgvector database...');
           }
         }
       } catch (err) {
-        console.error("Job polling error:", err);
+        console.error('Job polling error:', err);
       }
     }, 2000);
   };
@@ -468,7 +488,7 @@ function App() {
     if (token) {
       fetchTopics(true);
     }
-    
+
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
@@ -490,7 +510,7 @@ function App() {
     if (!token) return;
     try {
       const res = await fetch(`${apiUrl}/api/questions/tags?topic_id=${topicId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -514,17 +534,20 @@ function App() {
     setExamTagFilters(prev => prev.filter(t => t !== tag));
   };
 
-
-
   // ---- Exam Simulator Timing & Actions (Phase 6) ----
   useEffect(() => {
-    if (activeSession && activeSession.status === 'in_progress' && examMode === 'timed' && examTimeRemaining !== null) {
+    if (
+      activeSession &&
+      activeSession.status === 'in_progress' &&
+      examMode === 'timed' &&
+      examTimeRemaining !== null
+    ) {
       if (examTimeRemaining <= 0) {
         handleCompleteExam();
         return;
       }
       const timer = setTimeout(() => {
-        setExamTimeRemaining(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
+        setExamTimeRemaining(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -542,7 +565,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
@@ -550,15 +573,15 @@ function App() {
           difficulty_filter: examDifficulty,
           tag_filter: examTagFilters,
           question_count: examCount,
-          time_limit_seconds: examMode === 'timed' ? examTimeLimitMinutes * 60 : null
-        })
+          time_limit_seconds: examMode === 'timed' ? examTimeLimitMinutes * 60 : null,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setActiveSession(data);
         setSessionQuestions(data.questions || []);
         setExamTimeRemaining(data.time_limit_seconds);
-        
+
         // Prepopulate selections if resume
         const answers: { [qid: string]: string } = {};
         const feedback: { [qid: string]: any } = {};
@@ -570,20 +593,20 @@ function App() {
             if (r.is_correct !== undefined && r.is_correct !== null) {
               feedback[r.question_id] = {
                 isCorrect: r.is_correct,
-                correctOptionId: r.correct_option_id
+                correctOptionId: r.correct_option_id,
               };
             }
           });
         }
         setSelectedAnswers(answers);
         setPracticeFeedback(feedback);
-        showToast("Simulation session started!", "success");
+        showToast('Simulation session started!', 'success');
       } else {
-        showToast(data.detail || "Failed to start exam session.", "error");
+        showToast(data.detail || 'Failed to start exam session.', 'error');
       }
     } catch (err) {
-      console.error("Error starting exam session:", err);
-      showToast("Network error starting exam session.", "error");
+      console.error('Error starting exam session:', err);
+      showToast('Network error starting exam session.', 'error');
     } finally {
       setIsStartingSession(false);
     }
@@ -605,12 +628,12 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           question_id: questionId,
-          selected_option_id: optionId
-        })
+          selected_option_id: optionId,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -619,16 +642,16 @@ function App() {
             ...prev,
             [questionId]: {
               isCorrect: data.is_correct,
-              correctOptionId: data.correct_option_id
-            }
+              correctOptionId: data.correct_option_id,
+            },
           }));
         }
       } else {
-        showToast(data.detail || "Failed to submit answer.", "error");
+        showToast(data.detail || 'Failed to submit answer.', 'error');
       }
     } catch (err) {
-      console.error("Error submitting answer:", err);
-      showToast("Network error submitting answer.", "error");
+      console.error('Error submitting answer:', err);
+      showToast('Network error submitting answer.', 'error');
     } finally {
       setIsSubmittingAnswer(prev => ({ ...prev, [questionId]: false }));
     }
@@ -641,17 +664,17 @@ function App() {
     try {
       const res = await fetch(`${apiUrl}/api/exams/sessions/${sessionId}/results`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
         setResultsMetrics(data);
       } else {
-        console.error("Failed to fetch session metrics");
+        console.error('Failed to fetch session metrics');
       }
     } catch (err) {
-      console.error("Error fetching session metrics:", err);
+      console.error('Error fetching session metrics:', err);
     } finally {
       setIsLoadingMetrics(false);
     }
@@ -667,50 +690,50 @@ function App() {
   // ---- Targeted Practice Weak Areas Trigger (Phase 7) ----
   const handlePracticeWeakAreas = async () => {
     if (!selectedTopic || !resultsMetrics || !token) return;
-    
+
     // Find weak areas (< 75% correct rate)
     const weakTags = resultsMetrics.tag_performance
       .filter((t: any) => t.percentage < 75)
       .map((t: any) => t.tag_name);
 
     if (weakTags.length === 0) {
-      showToast("No weak areas identified! Keep up the great work.", "success");
+      showToast('No weak areas identified! Keep up the great work.', 'success');
       return;
     }
 
     setIsGeneratingWeakAreaQuestions(true);
-    showToast(`Generating new practice questions targeted for: ${weakTags.join(', ')}...`, "info");
+    showToast(`Generating new practice questions targeted for: ${weakTags.join(', ')}...`, 'info');
 
     try {
       const genRes = await fetch(`${apiUrl}/api/questions/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
           count: 5,
-          difficulty: "mixed",
-          tag_filters: weakTags
-        })
+          difficulty: 'mixed',
+          tag_filters: weakTags,
+        }),
       });
 
       const genData = await genRes.json();
       if (genRes.ok) {
-        showToast(`Successfully generated ${genData.generated} new practice questions!`, "success");
+        showToast(`Successfully generated ${genData.generated} new practice questions!`, 'success');
         await fetchTags(selectedTopic.id);
-        
+
         // Prepopulate setup and switch tab
         setExamTagFilters(weakTags);
         setExamMode('practice');
         setActiveTab('exam');
       } else {
-        showToast(genData.detail || "Failed to generate practice questions.", "error");
+        showToast(genData.detail || 'Failed to generate practice questions.', 'error');
       }
     } catch (err) {
-      console.error("Error generating targeted questions:", err);
-      showToast("Network error generating practice questions.", "error");
+      console.error('Error generating targeted questions:', err);
+      showToast('Network error generating practice questions.', 'error');
     } finally {
       setIsGeneratingWeakAreaQuestions(false);
     }
@@ -719,44 +742,44 @@ function App() {
   const handleGenerateAllQuestions = async () => {
     if (!selectedTopic || !token) return;
     setIsGeneratingAllQuestions(true);
-    showToast(`Generating questions using ${llmProvider.toUpperCase()} AI...`, "info");
+    showToast(`Generating questions using ${llmProvider.toUpperCase()} AI...`, 'info');
     try {
       const res = await fetch(`${apiUrl}/api/questions/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
           count: 10,
-          difficulty: "mixed"
-        })
+          difficulty: 'mixed',
+        }),
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Successfully generated ${data.generated} questions!`, "success");
+        showToast(`Successfully generated ${data.generated} questions!`, 'success');
         await fetchTags(selectedTopic.id);
       } else {
-        showToast(data.detail || "Failed to generate questions.", "error");
+        showToast(data.detail || 'Failed to generate questions.', 'error');
       }
     } catch (err) {
-      console.error("Error generating questions:", err);
-      showToast("Network error generating questions.", "error");
+      console.error('Error generating questions:', err);
+      showToast('Network error generating questions.', 'error');
     } finally {
       setIsGeneratingAllQuestions(false);
     }
   };
 
   const handleCompleteExam = async () => {
-    const targetSessionId = activeSession?.id || (sessionCompletedResults?.id);
+    const targetSessionId = activeSession?.id || sessionCompletedResults?.id;
     if (!targetSessionId) return;
     try {
       const res = await fetch(`${apiUrl}/api/exams/sessions/${targetSessionId}/complete`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
       if (res.ok) {
@@ -764,13 +787,13 @@ function App() {
         setSessionCompletedResults(data);
         fetchSessionMetrics(data.id);
         setActiveTab('results'); // jump to results automatically
-        showToast("Session concluded!", "success");
+        showToast('Session concluded!', 'success');
       } else {
-        showToast(data.detail || "Failed to complete session.", "error");
+        showToast(data.detail || 'Failed to complete session.', 'error');
       }
     } catch (err) {
-      console.error("Error completing session:", err);
-      showToast("Network error concluding session.", "error");
+      console.error('Error completing session:', err);
+      showToast('Network error concluding session.', 'error');
     }
   };
 
@@ -813,69 +836,104 @@ function App() {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Toast Notification Banner */}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 1000,
-          padding: '12px 24px',
-          borderRadius: '10px',
-          background: toast.type === 'success' ? 'rgba(20, 184, 166, 0.95)' : toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(99, 102, 241, 0.95)',
-          color: '#ffffff',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(8px)',
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          animation: 'fadeIn var(--transition-fast) forwards'
-        }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 1000,
+            padding: '12px 24px',
+            borderRadius: '10px',
+            background:
+              toast.type === 'success'
+                ? 'rgba(20, 184, 166, 0.95)'
+                : toast.type === 'error'
+                  ? 'rgba(239, 68, 68, 0.95)'
+                  : 'rgba(99, 102, 241, 0.95)',
+            color: '#ffffff',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(8px)',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: 'fadeIn var(--transition-fast) forwards',
+          }}
+        >
           {toast.type === 'error' && <AlertCircle size={18} />}
           <span>{toast.message}</span>
         </div>
       )}
 
       {/* Sidebar Navigation */}
-      <aside style={{ 
-        width: '280px', 
-        borderRight: '1px solid var(--border-color)', 
-        background: 'var(--bg-secondary)', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'space-between',
-        padding: '24px',
-        position: 'sticky',
-        top: 0,
-        height: '100vh'
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, paddingBottom: '16px' }}>
+      <aside
+        style={{
+          width: '280px',
+          borderRight: '1px solid var(--border-color)',
+          background: 'var(--bg-secondary)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: '24px',
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            flex: 1,
+            paddingBottom: '16px',
+          }}
+        >
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.25rem',
-              color: '#fff',
-              fontFamily: 'var(--font-display)'
-            }}>
+            <div
+              style={{
+                background:
+                  'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '1.25rem',
+                color: '#fff',
+                fontFamily: 'var(--font-display)',
+              }}
+            >
               EP
             </div>
             <div>
-              <h1 style={{ fontSize: '1.15rem', margin: 0, padding: 0, background: 'none', WebkitTextFillColor: 'initial', color: 'var(--text-primary)' }}>ExamPrep AI</h1>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Local-First MVP</span>
+              <h1
+                style={{
+                  fontSize: '1.15rem',
+                  margin: 0,
+                  padding: 0,
+                  background: 'none',
+                  WebkitTextFillColor: 'initial',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                ExamPrep AI
+              </h1>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Local-First MVP
+              </span>
             </div>
           </div>
 
           {/* Navigation Links */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}>
-            <button 
+          <nav
+            style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}
+          >
+            <button
               onClick={() => setActiveTab('dashboard')}
               style={{
                 display: 'flex',
@@ -885,18 +943,19 @@ function App() {
                 padding: '12px 16px',
                 border: 'none',
                 background: activeTab === 'dashboard' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                color: activeTab === 'dashboard' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                color:
+                  activeTab === 'dashboard' ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontWeight: activeTab === 'dashboard' ? 600 : 400,
-                transition: 'var(--transition-fast)'
+                transition: 'var(--transition-fast)',
               }}
             >
               <Layers size={18} />
               <span>Dashboard</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('setup')}
               style={{
                 display: 'flex',
@@ -911,13 +970,13 @@ function App() {
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontWeight: activeTab === 'setup' ? 600 : 400,
-                transition: 'var(--transition-fast)'
+                transition: 'var(--transition-fast)',
               }}
             >
               <Settings size={18} />
               <span>Setup & Ingestion</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('exam')}
               style={{
                 display: 'flex',
@@ -932,13 +991,13 @@ function App() {
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontWeight: activeTab === 'exam' ? 600 : 400,
-                transition: 'var(--transition-fast)'
+                transition: 'var(--transition-fast)',
               }}
             >
               <Clock size={18} />
               <span>Exam Simulator</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('results')}
               style={{
                 display: 'flex',
@@ -953,7 +1012,7 @@ function App() {
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontWeight: activeTab === 'results' ? 600 : 400,
-                transition: 'var(--transition-fast)'
+                transition: 'var(--transition-fast)',
               }}
             >
               <TrendingUp size={18} />
@@ -963,32 +1022,67 @@ function App() {
 
           {/* Topics Area */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '180px' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Topics</span>
-            
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Your Topics
+            </span>
+
             {/* Scrollable list of topics */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', overflowY: 'auto', maxHeight: '200px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                marginTop: '8px',
+                overflowY: 'auto',
+                maxHeight: '200px',
+              }}
+            >
               {isLoadingTopics ? (
-                <div style={{ padding: '12px', display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <div
+                  style={{
+                    padding: '12px',
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem',
+                  }}
+                >
                   <Loader2 size={14} className="animate-spin" />
                   <span>Loading topics...</span>
                 </div>
               ) : (
-                topics.map((t) => (
-                  <div 
+                topics.map(t => (
+                  <div
                     key={t.id}
                     onClick={() => setSelectedTopic(t)}
-                    style={{ 
-                      padding: '8px 12px', 
-                      borderRadius: '6px', 
-                      fontSize: '0.9rem', 
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.9rem',
                       cursor: 'pointer',
-                      background: selectedTopic?.id === t.id ? 'rgba(255,255,255,0.03)' : 'transparent',
-                      borderLeft: selectedTopic?.id === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                      color: selectedTopic?.id === t.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      background:
+                        selectedTopic?.id === t.id ? 'rgba(255,255,255,0.03)' : 'transparent',
+                      borderLeft:
+                        selectedTopic?.id === t.id
+                          ? '2px solid var(--accent-primary)'
+                          : '2px solid transparent',
+                      color:
+                        selectedTopic?.id === t.id
+                          ? 'var(--text-primary)'
+                          : 'var(--text-secondary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     {t.name}
@@ -998,14 +1092,24 @@ function App() {
             </div>
 
             {/* Quick Topic Creator */}
-            <form onSubmit={handleCreateTopic} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+            <form
+              onSubmit={handleCreateTopic}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid var(--border-color)',
+              }}
+            >
               <input
                 type="text"
                 required
                 disabled={isCreatingTopic}
                 placeholder="Add study topic..."
                 value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
+                onChange={e => setNewTopicName(e.target.value)}
                 style={{
                   flex: 1,
                   padding: '8px 10px',
@@ -1013,16 +1117,20 @@ function App() {
                   borderRadius: '6px',
                   background: 'rgba(0, 0, 0, 0.2)',
                   border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
+                  color: 'var(--text-primary)',
                 }}
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isCreatingTopic || !newTopicName.trim()}
                 className="btn btn-primary"
                 style={{ padding: '8px 10px', borderRadius: '6px', fontSize: '0.8rem' }}
               >
-                {isCreatingTopic ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {isCreatingTopic ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Plus size={14} />
+                )}
               </button>
             </form>
           </div>
@@ -1031,25 +1139,37 @@ function App() {
         {/* Infrastructure Indicator and Logout */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Database Status Widget */}
-          <div className="glass-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
+          <div
+            className="glass-card"
+            style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <Database size={16} color={dbConnected ? 'var(--accent-teal)' : '#f59e0b'} />
               <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Local Infrastructure</span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              {dbConnected ? 'Postgres + pgvector is online and ready.' : 'Database offline or starting...'}
+            <p
+              style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}
+            >
+              {dbConnected
+                ? 'Postgres + pgvector is online and ready.'
+                : 'Database offline or starting...'}
             </p>
-            <button 
+            <button
               onClick={checkHealth}
-              className="btn btn-secondary" 
-              style={{ width: '100%', padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px' }}
+              className="btn btn-secondary"
+              style={{
+                width: '100%',
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                borderRadius: '6px',
+              }}
             >
               Test Connection
             </button>
           </div>
 
           {/* Logout Button */}
-          <button 
+          <button
             onClick={handleLogout}
             style={{
               display: 'flex',
@@ -1064,12 +1184,12 @@ function App() {
               cursor: 'pointer',
               textAlign: 'left',
               fontWeight: 600,
-              transition: 'var(--transition-fast)'
+              transition: 'var(--transition-fast)',
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={e => {
               e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
             }}
           >
@@ -1082,36 +1202,89 @@ function App() {
       {/* Main Panel */}
       <main style={{ flex: 1, padding: '40px', overflowY: 'auto', height: '100vh' }}>
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <header
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '40px',
+          }}
+        >
           <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', fontWeight: 600, textTransform: 'uppercase' }}>Workspace: local_host_dev</span>
-            <h2 style={{ fontSize: '1.8rem', fontFamily: 'var(--font-display)', margin: 0 }}>Active Subject: {selectedTopic?.name || 'Loading topics...'}</h2>
+            <span
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--accent-primary)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+              }}
+            >
+              Workspace: local_host_dev
+            </span>
+            <h2 style={{ fontSize: '1.8rem', fontFamily: 'var(--font-display)', margin: 0 }}>
+              Active Subject: {selectedTopic?.name || 'Loading topics...'}
+            </h2>
           </div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             {/* Database status widget */}
-            <div className="glass-card" style={{ padding: '8px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dbConnected ? 'var(--accent-teal)' : '#f59e0b' }}></div>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status: {dbConnected ? 'Online' : 'Configuring'}</span>
+            <div
+              className="glass-card"
+              style={{
+                padding: '8px 16px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: dbConnected ? 'var(--accent-teal)' : '#f59e0b',
+                }}
+              ></div>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Status: {dbConnected ? 'Online' : 'Configuring'}
+              </span>
             </div>
-            
+
             {/* User Profile widget */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px', borderLeft: '1px solid var(--border-color)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                paddingLeft: '16px',
+                borderLeft: '1px solid var(--border-color)',
+              }}
+            >
               <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    margin: 0,
+                  }}
+                >
                   {user?.display_name || user?.email?.split('@')[0]}
                 </p>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
                   {user?.plan_tier ? `${user.plan_tier.toUpperCase()} Member` : 'Free Scholar'}
                 </p>
               </div>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                border: '2px solid var(--accent-primary-glow)',
-                overflow: 'hidden',
-                background: 'rgba(255,255,255,0.05)'
-              }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '2px solid var(--accent-primary-glow)',
+                  overflow: 'hidden',
+                  background: 'rgba(255,255,255,0.05)',
+                }}
+              >
                 <img
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuARmHieBq0AtO28rAhGCQalLv-ogF1Zu5wy0dcWHBEKZNP6LpXLW5sf97h2d9uCWhoYXf5rEHGbT6RTUtN-23wHvh3a7gwNWW4T6hzLx0a15mPrT7J6DmHt_MpRzEbKJbIjrZgq9Adg-Wy6AqfpSTD6hKu3PiE6FHuIRafHFRSTL_lMJl8PTQpSsVIcSlUggAf81z89uLzqG2P6uaGL8FBZqhpyc4a74x9XFOB_QuByoSJaWNcHqts2oGUsXIuWBTz1WHVbUqw7sRXg"
                   alt="Avatar"
@@ -1124,18 +1297,33 @@ function App() {
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
-          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div
+            className="fade-in"
+            style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
+          >
             {/* Hero Welcome banner */}
-            <div className="glass-card" style={{ 
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
+            <div
+              className="glass-card"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
               <div style={{ position: 'relative', zIndex: 2 }}>
                 <h1 style={{ marginBottom: '12px' }}>Welcome to ExamPrep AI!</h1>
-                <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', fontSize: '1.05rem', marginBottom: '20px' }}>
-                  A local-first environment for document parsing, semantic chunk database search, and automated mock exam preparation using pgvector and configured LLMs.
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    maxWidth: '600px',
+                    fontSize: '1.05rem',
+                    marginBottom: '20px',
+                  }}
+                >
+                  A local-first environment for document parsing, semantic chunk database search,
+                  and automated mock exam preparation using pgvector and configured LLMs.
                 </p>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button onClick={() => setActiveTab('setup')} className="btn btn-primary">
@@ -1143,15 +1331,17 @@ function App() {
                   </button>
                 </div>
               </div>
-              <div style={{ 
-                position: 'absolute', 
-                right: '-30px', 
-                bottom: '-30px', 
-                fontSize: '12rem', 
-                opacity: 0.1, 
-                userSelect: 'none',
-                transform: 'rotate(15deg)'
-              }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  right: '-30px',
+                  bottom: '-30px',
+                  fontSize: '12rem',
+                  opacity: 0.1,
+                  userSelect: 'none',
+                  transform: 'rotate(15deg)',
+                }}
+              >
                 🎓
               </div>
             </div>
@@ -1159,35 +1349,94 @@ function App() {
             {/* Config files checklist and Directory Status */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div className="glass-card">
-                <h3 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3
+                  style={{
+                    fontSize: '1.25rem',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
                   <CheckCircle2 color="var(--accent-teal)" size={20} />
                   System Pipeline Status
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      paddingBottom: '12px',
+                      borderBottom: '1px solid var(--border-color)',
+                    }}
+                  >
                     <div>
-                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>Active Topic Domain</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Currently selected subject scope</span>
+                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>
+                        Active Topic Domain
+                      </strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Currently selected subject scope
+                      </span>
                     </div>
-                    <span style={{ color: selectedTopic ? 'var(--accent-teal)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        color: selectedTopic ? 'var(--accent-teal)' : 'var(--text-muted)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                      }}
+                    >
                       {selectedTopic ? selectedTopic.name : 'None Selected'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      paddingBottom: '12px',
+                      borderBottom: '1px solid var(--border-color)',
+                    }}
+                  >
                     <div>
-                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>Ingested Documents</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Files parsed in active topic</span>
+                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>
+                        Ingested Documents
+                      </strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Files parsed in active topic
+                      </span>
                     </div>
-                    <span style={{ color: documents.length > 0 ? 'var(--accent-teal)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        color: documents.length > 0 ? 'var(--accent-teal)' : 'var(--text-muted)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                      }}
+                    >
                       {documents.length} File(s)
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      paddingBottom: '12px',
+                      borderBottom: '1px solid var(--border-color)',
+                    }}
+                  >
                     <div>
-                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>Postgres pgvector Vectorizer</strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tracks whether DB structure is loaded</span>
+                      <strong style={{ display: 'block', fontSize: '0.95rem' }}>
+                        Postgres pgvector Vectorizer
+                      </strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Tracks whether DB structure is loaded
+                      </span>
                     </div>
-                    <span style={{ color: dbConnected ? 'var(--accent-teal)' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        color: dbConnected ? 'var(--accent-teal)' : 'var(--text-muted)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                      }}
+                    >
                       {dbConnected ? 'Online' : 'Offline'}
                     </span>
                   </div>
@@ -1195,23 +1444,61 @@ function App() {
               </div>
 
               <div className="glass-card">
-                <h3 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3
+                  style={{
+                    fontSize: '1.25rem',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
                   <FolderOpen color="var(--accent-primary)" size={20} />
                   Workspace Summary
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                    <div style={{ color: 'var(--accent-primary)' }}><FolderOpen size={20} /></div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px',
+                      background: 'rgba(255,255,255,0.02)',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <div style={{ color: 'var(--accent-primary)' }}>
+                      <FolderOpen size={20} />
+                    </div>
                     <div style={{ flex: 1 }}>
-                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>Topic Directories</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{topics.length} study topics configured</span>
+                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>
+                        Topic Directories
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {topics.length} study topics configured
+                      </span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                    <div style={{ color: 'var(--accent-teal)' }}><Database size={20} /></div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px',
+                      background: 'rgba(255,255,255,0.02)',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <div style={{ color: 'var(--accent-teal)' }}>
+                      <Database size={20} />
+                    </div>
                     <div style={{ flex: 1 }}>
-                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>Ingested Sources</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>All segments stored in content_chunks table</span>
+                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>
+                        Ingested Sources
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        All segments stored in content_chunks table
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1223,75 +1510,167 @@ function App() {
         {/* Setup wizard screen */}
         {activeTab === 'setup' && (
           <div className="fade-in glass-card">
-            <h2 style={{ marginBottom: '24px', fontFamily: 'var(--font-display)' }}>Setup Wizard & Document Ingestion</h2>
-            
+            <h2 style={{ marginBottom: '24px', fontFamily: 'var(--font-display)' }}>
+              Setup Wizard & Document Ingestion
+            </h2>
+
             <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '32px' }}>
               <div>
                 <div className="form-group">
                   <label>1. Target Topic Domain</label>
-                  <select 
-                    value={selectedTopic?.id || ''} 
-                    onChange={(e) => {
+                  <select
+                    value={selectedTopic?.id || ''}
+                    onChange={e => {
                       const topic = topics.find(t => t.id === e.target.value);
                       if (topic) setSelectedTopic(topic);
                     }}
                     style={{ width: '100%' }}
                   >
-                    {topics.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                    {topics.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '24px' }}>
                   <label>2. Choose Ingestion Method</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr 1fr',
+                      gap: '12px',
+                      marginTop: '4px',
+                    }}
+                  >
                     {/* Method 1: File Upload */}
-                    <div 
+                    <div
                       onClick={() => !uploading && setIngestionMethod('upload')}
-                      style={{ 
-                        border: ingestionMethod === 'upload' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
-                        padding: '16px', 
-                        borderRadius: '8px', 
-                        cursor: uploading ? 'not-allowed' : 'pointer', 
-                        background: ingestionMethod === 'upload' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
-                        transition: 'all 0.2s ease'
+                      style={{
+                        border:
+                          ingestionMethod === 'upload'
+                            ? '1px solid var(--accent-primary)'
+                            : '1px solid var(--border-color)',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        background:
+                          ingestionMethod === 'upload'
+                            ? 'rgba(99, 102, 241, 0.05)'
+                            : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'upload' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>File Upload</strong>
-                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'upload' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Upload PDF, MD, or TXT document.</span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          marginBottom: '4px',
+                          color:
+                            ingestionMethod === 'upload'
+                              ? 'var(--text-primary)'
+                              : 'var(--text-secondary)',
+                        }}
+                      >
+                        File Upload
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color:
+                            ingestionMethod === 'upload'
+                              ? 'var(--text-secondary)'
+                              : 'var(--text-muted)',
+                        }}
+                      >
+                        Upload PDF, MD, or TXT document.
+                      </span>
                     </div>
 
                     {/* Method 2: Raw Text Paste */}
-                    <div 
+                    <div
                       onClick={() => !uploading && setIngestionMethod('raw_text')}
-                      style={{ 
-                        border: ingestionMethod === 'raw_text' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
-                        padding: '16px', 
-                        borderRadius: '8px', 
-                        cursor: uploading ? 'not-allowed' : 'pointer', 
-                        background: ingestionMethod === 'raw_text' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
-                        transition: 'all 0.2s ease'
+                      style={{
+                        border:
+                          ingestionMethod === 'raw_text'
+                            ? '1px solid var(--accent-primary)'
+                            : '1px solid var(--border-color)',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        background:
+                          ingestionMethod === 'raw_text'
+                            ? 'rgba(99, 102, 241, 0.05)'
+                            : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'raw_text' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>Raw Text</strong>
-                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'raw_text' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Paste raw text contents directly.</span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          marginBottom: '4px',
+                          color:
+                            ingestionMethod === 'raw_text'
+                              ? 'var(--text-primary)'
+                              : 'var(--text-secondary)',
+                        }}
+                      >
+                        Raw Text
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color:
+                            ingestionMethod === 'raw_text'
+                              ? 'var(--text-secondary)'
+                              : 'var(--text-muted)',
+                        }}
+                      >
+                        Paste raw text contents directly.
+                      </span>
                     </div>
 
                     {/* Method 3: Web Search/Parse */}
-                    <div 
+                    <div
                       onClick={() => !uploading && setIngestionMethod('web_search')}
-                      style={{ 
-                        border: ingestionMethod === 'web_search' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
-                        padding: '16px', 
-                        borderRadius: '8px', 
-                        cursor: uploading ? 'not-allowed' : 'pointer', 
-                        background: ingestionMethod === 'web_search' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
-                        transition: 'all 0.2s ease'
+                      style={{
+                        border:
+                          ingestionMethod === 'web_search'
+                            ? '1px solid var(--accent-primary)'
+                            : '1px solid var(--border-color)',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        background:
+                          ingestionMethod === 'web_search'
+                            ? 'rgba(99, 102, 241, 0.05)'
+                            : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'web_search' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>Web Search</strong>
-                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'web_search' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Provide syllabus & topics to agent.</span>
+                      <strong
+                        style={{
+                          display: 'block',
+                          marginBottom: '4px',
+                          color:
+                            ingestionMethod === 'web_search'
+                              ? 'var(--text-primary)'
+                              : 'var(--text-secondary)',
+                        }}
+                      >
+                        Web Search
+                      </strong>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color:
+                            ingestionMethod === 'web_search'
+                              ? 'var(--text-secondary)'
+                              : 'var(--text-muted)',
+                        }}
+                      >
+                        Provide syllabus & topics to agent.
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1300,25 +1679,25 @@ function App() {
                 {ingestionMethod === 'upload' && (
                   <>
                     {/* Drag and Drop Zone */}
-                    <div 
+                    <div
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       onClick={() => !uploading && fileInputRef.current?.click()}
-                      style={{ 
-                        border: '2px dashed var(--border-color)', 
-                        borderRadius: '12px', 
-                        padding: '32px', 
-                        textAlign: 'center', 
+                      style={{
+                        border: '2px dashed var(--border-color)',
+                        borderRadius: '12px',
+                        padding: '32px',
+                        textAlign: 'center',
                         marginBottom: '24px',
                         cursor: uploading ? 'not-allowed' : 'pointer',
                         background: 'rgba(255,255,255,0.01)',
                         transition: 'border-color 0.2s ease',
-                        position: 'relative'
+                        position: 'relative',
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={e => {
                         if (!uploading) e.currentTarget.style.borderColor = 'var(--accent-primary)';
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={e => {
                         if (!uploading) e.currentTarget.style.borderColor = 'var(--border-color)';
                       }}
                     >
@@ -1330,10 +1709,21 @@ function App() {
                         style={{ display: 'none' }}
                         disabled={uploading}
                       />
-                      <Upload size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
+                      <Upload
+                        size={32}
+                        color="var(--text-muted)"
+                        style={{ marginBottom: '12px' }}
+                      />
                       {selectedFile ? (
                         <div>
-                          <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                          <p
+                            style={{
+                              fontSize: '0.95rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                              marginBottom: '4px',
+                            }}
+                          >
                             {selectedFile.name}
                           </p>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -1342,7 +1732,13 @@ function App() {
                         </div>
                       ) : (
                         <div>
-                          <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                          <p
+                            style={{
+                              fontSize: '0.95rem',
+                              color: 'var(--text-secondary)',
+                              marginBottom: '8px',
+                            }}
+                          >
                             Drag & drop documents here, or click to select file
                           </p>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -1354,32 +1750,71 @@ function App() {
 
                     {/* Progress bar during uploads */}
                     {uploading && (
-                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                      <div
+                        style={{
+                          marginBottom: '24px',
+                          padding: '16px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                            }}
+                          >
+                            {jobStatus.toUpperCase() === 'PENDING'
+                              ? 'Queuing Ingestion Task...'
+                              : jobMessage}
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                            }}
+                          >
                             {jobProgress}%
                           </span>
                         </div>
                         {/* Background Progress Bar */}
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            width: `${jobProgress}%`, 
-                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                        <div
+                          style={{
+                            height: '6px',
+                            background: 'rgba(255,255,255,0.05)',
                             borderRadius: '3px',
-                            transition: 'width 0.3s ease'
-                          }} />
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${jobProgress}%`,
+                              background:
+                                'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                              borderRadius: '3px',
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
                         </div>
                       </div>
                     )}
 
-                    <button 
+                    <button
                       disabled={!selectedFile || uploading || !selectedTopic}
                       onClick={handleIngestFile}
-                      className="btn btn-primary" 
+                      className="btn btn-primary"
                       style={{ width: '100%' }}
                     >
                       {uploading ? (
@@ -1398,25 +1833,25 @@ function App() {
                   <>
                     <div className="form-group">
                       <label>Document Title</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        placeholder="e.g., Intro to Algorithms Notes" 
+                        placeholder="e.g., Intro to Algorithms Notes"
                         value={rawTextTitle}
-                        onChange={(e) => setRawTextTitle(e.target.value)}
+                        onChange={e => setRawTextTitle(e.target.value)}
                         disabled={uploading}
                         style={{ width: '100%' }}
                       />
                     </div>
-                    
+
                     <div className="form-group" style={{ marginBottom: '24px' }}>
                       <label>Paste Document Contents</label>
-                      <textarea 
+                      <textarea
                         required
                         rows={6}
-                        placeholder="Paste the raw text here for chunking and question generation..." 
+                        placeholder="Paste the raw text here for chunking and question generation..."
                         value={rawTextContent}
-                        onChange={(e) => setRawTextContent(e.target.value)}
+                        onChange={e => setRawTextContent(e.target.value)}
                         disabled={uploading}
                         style={{ width: '100%', resize: 'vertical' }}
                       />
@@ -1424,32 +1859,76 @@ function App() {
 
                     {/* Progress bar during uploads */}
                     {uploading && (
-                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                      <div
+                        style={{
+                          marginBottom: '24px',
+                          padding: '16px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                            }}
+                          >
+                            {jobStatus.toUpperCase() === 'PENDING'
+                              ? 'Queuing Ingestion Task...'
+                              : jobMessage}
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                            }}
+                          >
                             {jobProgress}%
                           </span>
                         </div>
                         {/* Background Progress Bar */}
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            width: `${jobProgress}%`, 
-                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                        <div
+                          style={{
+                            height: '6px',
+                            background: 'rgba(255,255,255,0.05)',
                             borderRadius: '3px',
-                            transition: 'width 0.3s ease'
-                          }} />
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${jobProgress}%`,
+                              background:
+                                'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                              borderRadius: '3px',
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
                         </div>
                       </div>
                     )}
 
-                    <button 
-                      disabled={!rawTextTitle.trim() || !rawTextContent.trim() || uploading || !selectedTopic}
+                    <button
+                      disabled={
+                        !rawTextTitle.trim() ||
+                        !rawTextContent.trim() ||
+                        uploading ||
+                        !selectedTopic
+                      }
                       onClick={handleIngestRawText}
-                      className="btn btn-primary" 
+                      className="btn btn-primary"
                       style={{ width: '100%' }}
                     >
                       {uploading ? (
@@ -1468,12 +1947,12 @@ function App() {
                   <>
                     <div className="form-group">
                       <label>Search Title</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
-                        placeholder="e.g., Kubernetes Core Concepts" 
+                        placeholder="e.g., Kubernetes Core Concepts"
                         value={webSearchTitle}
-                        onChange={(e) => setWebSearchTitle(e.target.value)}
+                        onChange={e => setWebSearchTitle(e.target.value)}
                         disabled={uploading}
                         style={{ width: '100%' }}
                       />
@@ -1481,12 +1960,12 @@ function App() {
 
                     <div className="form-group">
                       <label>Syllabus Requirements</label>
-                      <textarea 
+                      <textarea
                         required
                         rows={2}
-                        placeholder="Provide the syllabus outline to focus..." 
+                        placeholder="Provide the syllabus outline to focus..."
                         value={webSearchSyllabus}
-                        onChange={(e) => setWebSearchSyllabus(e.target.value)}
+                        onChange={e => setWebSearchSyllabus(e.target.value)}
                         disabled={uploading}
                         style={{ width: '100%', resize: 'vertical' }}
                       />
@@ -1494,49 +1973,106 @@ function App() {
 
                     <div className="form-group" style={{ marginBottom: '20px' }}>
                       <label>Topics to Search / Parse</label>
-                      <textarea 
+                      <textarea
                         required
                         rows={2}
-                        placeholder="List of search terms (e.g. pods, services, deployments)..." 
+                        placeholder="List of search terms (e.g. pods, services, deployments)..."
                         value={webSearchTopics}
-                        onChange={(e) => setWebSearchTopics(e.target.value)}
+                        onChange={e => setWebSearchTopics(e.target.value)}
                         disabled={uploading}
                         style={{ width: '100%', resize: 'vertical' }}
                       />
                     </div>
 
-                    <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                      <strong>Agent Parse Simulation Note:</strong> Web search parsing is simulated. Clicking submit will automatically run web search agents (simulated corpus assembly) and ingest the results.
+                    <div
+                      style={{
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: 'rgba(99,102,241,0.05)',
+                        border: '1px solid rgba(99,102,241,0.15)',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '24px',
+                      }}
+                    >
+                      <strong>Agent Parse Simulation Note:</strong> Web search parsing is simulated.
+                      Clicking submit will automatically run web search agents (simulated corpus
+                      assembly) and ingest the results.
                     </div>
 
                     {/* Progress bar during uploads */}
                     {uploading && (
-                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                      <div
+                        style={{
+                          marginBottom: '24px',
+                          padding: '16px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                            }}
+                          >
+                            {jobStatus.toUpperCase() === 'PENDING'
+                              ? 'Queuing Ingestion Task...'
+                              : jobMessage}
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                          <span
+                            style={{
+                              fontSize: '0.85rem',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                            }}
+                          >
                             {jobProgress}%
                           </span>
                         </div>
                         {/* Background Progress Bar */}
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            width: `${jobProgress}%`, 
-                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                        <div
+                          style={{
+                            height: '6px',
+                            background: 'rgba(255,255,255,0.05)',
                             borderRadius: '3px',
-                            transition: 'width 0.3s ease'
-                          }} />
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${jobProgress}%`,
+                              background:
+                                'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                              borderRadius: '3px',
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
                         </div>
                       </div>
                     )}
 
-                    <button 
-                      disabled={!webSearchTitle.trim() || !webSearchSyllabus.trim() || !webSearchTopics.trim() || uploading || !selectedTopic}
+                    <button
+                      disabled={
+                        !webSearchTitle.trim() ||
+                        !webSearchSyllabus.trim() ||
+                        !webSearchTopics.trim() ||
+                        uploading ||
+                        !selectedTopic
+                      }
                       onClick={handleIngestWebSearch}
-                      className="btn btn-primary" 
+                      className="btn btn-primary"
                       style={{ width: '100%' }}
                     >
                       {uploading ? (
@@ -1553,74 +2089,124 @@ function App() {
               </div>
 
               <div>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Ingested Documents list</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '420px' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>
+                  Ingested Documents list
+                </h3>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    overflowY: 'auto',
+                    maxHeight: '420px',
+                  }}
+                >
                   {isLoadingDocs ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                    <div
+                      style={{
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      <Loader2
+                        size={24}
+                        className="animate-spin"
+                        style={{ margin: '0 auto 12px' }}
+                      />
                       <span>Fetching documents...</span>
                     </div>
                   ) : documents.length === 0 ? (
-                    <div style={{
-                      padding: '24px',
-                      textAlign: 'center',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px dashed var(--border-color)',
-                      borderRadius: '8px',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.85rem'
-                    }}>
+                    <div
+                      style={{
+                        padding: '24px',
+                        textAlign: 'center',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px dashed var(--border-color)',
+                        borderRadius: '8px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                      }}
+                    >
                       No documents ingested yet. Upload a syllabus or study material to begin.
                     </div>
                   ) : (
-                    documents.map((doc) => (
-                      <div 
-                        key={doc.id} 
-                        style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center', 
-                          padding: '12px', 
-                          background: 'rgba(255,255,255,0.02)', 
-                          borderRadius: '8px', 
-                          border: '1px solid var(--border-color)' 
+                    documents.map(doc => (
+                      <div
+                        key={doc.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px',
+                          background: 'rgba(255,255,255,0.02)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, paddingRight: '8px' }}>
-                          <FileText size={18} color="var(--accent-secondary)" style={{ flexShrink: 0 }} />
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            minWidth: 0,
+                            flex: 1,
+                            paddingRight: '8px',
+                          }}
+                        >
+                          <FileText
+                            size={18}
+                            color="var(--accent-secondary)"
+                            style={{ flexShrink: 0 }}
+                          />
                           <div style={{ minWidth: 0 }}>
-                            <strong style={{ 
-                              fontSize: '0.85rem', 
-                              display: 'block', 
-                              color: 'var(--text-primary)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
+                            <strong
+                              style={{
+                                fontSize: '0.85rem',
+                                display: 'block',
+                                color: 'var(--text-primary)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
                               {doc.original_filename}
                             </strong>
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              Type: {doc.source_type === 'upload_pdf' ? 'PDF Document' : 
-                                     doc.source_type === 'manual_topic_text' ? 'Raw Text Ingest' : 
-                                     doc.source_type === 'web_scan' ? 'Web Search/Parse (Simulated)' : 'Text/Markdown'}
+                              Type:{' '}
+                              {doc.source_type === 'upload_pdf'
+                                ? 'PDF Document'
+                                : doc.source_type === 'manual_topic_text'
+                                  ? 'Raw Text Ingest'
+                                  : doc.source_type === 'web_scan'
+                                    ? 'Web Search/Parse (Simulated)'
+                                    : 'Text/Markdown'}
                             </span>
                           </div>
                         </div>
-                        
+
                         {/* Status Chip */}
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          padding: '2px 8px', 
-                          borderRadius: '10px', 
-                          background: doc.status === 'parsed' ? 'rgba(20, 184, 166, 0.1)' 
-                            : doc.status === 'failed' ? 'rgba(239, 68, 68, 0.1)'
-                            : 'rgba(168, 85, 247, 0.1)', 
-                          color: doc.status === 'parsed' ? 'var(--accent-teal)' 
-                            : doc.status === 'failed' ? '#ef4444'
-                            : 'var(--accent-secondary)',
-                          textTransform: 'capitalize',
-                          flexShrink: 0
-                        }}>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background:
+                              doc.status === 'parsed'
+                                ? 'rgba(20, 184, 166, 0.1)'
+                                : doc.status === 'failed'
+                                  ? 'rgba(239, 68, 68, 0.1)'
+                                  : 'rgba(168, 85, 247, 0.1)',
+                            color:
+                              doc.status === 'parsed'
+                                ? 'var(--accent-teal)'
+                                : doc.status === 'failed'
+                                  ? '#ef4444'
+                                  : 'var(--accent-secondary)',
+                            textTransform: 'capitalize',
+                            flexShrink: 0,
+                          }}
+                        >
                           {doc.status}
                         </span>
                       </div>
@@ -1634,34 +2220,43 @@ function App() {
 
         {/* Exam Config & Simulation Flow */}
         {activeTab === 'exam' && !activeSession && (
-          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          <div
+            className="fade-in"
+            style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}
+          >
             {/* Config Card */}
             <div className="glass-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}
+              >
                 <Sparkles size={22} color="var(--accent-primary)" />
-                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>Exam Simulator Setup</h2>
+                <h2 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>
+                  Exam Simulator Setup
+                </h2>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-
                 {/* Left — Config Inputs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
                   {/* Topic */}
                   <div className="form-group">
                     <label>Topic Domain</label>
                     <select
                       value={selectedTopic?.id || ''}
-                      onChange={(e) => {
+                      onChange={e => {
                         const topic = topics.find(t => t.id === e.target.value);
                         if (topic) setSelectedTopic(topic);
                       }}
                       style={{ width: '100%' }}
                       disabled={isStartingSession}
                     >
-                      {topics.length === 0 && <option value="">No topics — create one first</option>}
-                      {topics.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
+                      {topics.length === 0 && (
+                        <option value="">No topics — create one first</option>
+                      )}
+                      {topics.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1669,35 +2264,64 @@ function App() {
                   {/* Simulation Mode Selector */}
                   <div className="form-group">
                     <label>Simulation Mode</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '8px',
+                        marginTop: '4px',
+                      }}
+                    >
                       <button
                         onClick={() => setExamMode('practice')}
                         style={{
                           padding: '8px 4px',
                           borderRadius: '8px',
-                          border: examMode === 'practice' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                          background: examMode === 'practice' ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                          color: examMode === 'practice' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border:
+                            examMode === 'practice'
+                              ? '1px solid var(--accent-primary)'
+                              : '1px solid var(--border-color)',
+                          background:
+                            examMode === 'practice'
+                              ? 'rgba(99,102,241,0.12)'
+                              : 'rgba(255,255,255,0.02)',
+                          color:
+                            examMode === 'practice'
+                              ? 'var(--accent-primary)'
+                              : 'var(--text-secondary)',
                           fontWeight: examMode === 'practice' ? 700 : 400,
                           cursor: 'pointer',
                           fontSize: '0.8rem',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
                         }}
-                      >Practice Mode</button>
+                      >
+                        Practice Mode
+                      </button>
                       <button
                         onClick={() => setExamMode('timed')}
                         style={{
                           padding: '8px 4px',
                           borderRadius: '8px',
-                          border: examMode === 'timed' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                          background: examMode === 'timed' ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                          color: examMode === 'timed' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border:
+                            examMode === 'timed'
+                              ? '1px solid var(--accent-primary)'
+                              : '1px solid var(--border-color)',
+                          background:
+                            examMode === 'timed'
+                              ? 'rgba(99,102,241,0.12)'
+                              : 'rgba(255,255,255,0.02)',
+                          color:
+                            examMode === 'timed'
+                              ? 'var(--accent-primary)'
+                              : 'var(--text-secondary)',
                           fontWeight: examMode === 'timed' ? 700 : 400,
                           cursor: 'pointer',
                           fontSize: '0.8rem',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
                         }}
-                      >Timed Exam</button>
+                      >
+                        Timed Exam
+                      </button>
                     </div>
                   </div>
 
@@ -1706,17 +2330,35 @@ function App() {
                     <div className="form-group fade-in">
                       <label style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Time Limit (Minutes)</span>
-                        <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{examTimeLimitMinutes} min</span>
+                        <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
+                          {examTimeLimitMinutes} min
+                        </span>
                       </label>
                       <input
                         type="range"
-                        min={1} max={60} step={1}
+                        min={1}
+                        max={60}
+                        step={1}
                         value={examTimeLimitMinutes}
-                        onChange={(e) => setExamTimeLimitMinutes(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                        onChange={e => setExamTimeLimitMinutes(Number(e.target.value))}
+                        style={{
+                          width: '100%',
+                          accentColor: 'var(--accent-primary)',
+                          cursor: 'pointer',
+                        }}
                       />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        <span>1 min</span><span>30 min</span><span>60 min</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)',
+                          marginTop: '2px',
+                        }}
+                      >
+                        <span>1 min</span>
+                        <span>30 min</span>
+                        <span>60 min</span>
                       </div>
                     </div>
                   )}
@@ -1725,26 +2367,51 @@ function App() {
                   <div className="form-group">
                     <label style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Number of Questions</span>
-                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{examCount}</span>
+                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
+                        {examCount}
+                      </span>
                     </label>
                     <input
                       type="range"
-                      min={1} max={50} step={1}
+                      min={1}
+                      max={50}
+                      step={1}
                       value={examCount}
-                      onChange={(e) => setExamCount(Number(e.target.value))}
+                      onChange={e => setExamCount(Number(e.target.value))}
                       disabled={isStartingSession}
-                      style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                      style={{
+                        width: '100%',
+                        accentColor: 'var(--accent-primary)',
+                        cursor: 'pointer',
+                      }}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      <span>1</span><span>25</span><span>50</span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '0.72rem',
+                        color: 'var(--text-muted)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      <span>1</span>
+                      <span>25</span>
+                      <span>50</span>
                     </div>
                   </div>
 
                   {/* Difficulty */}
                   <div className="form-group">
                     <label>Difficulty</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginTop: '4px' }}>
-                      {(['easy','medium','hard','mixed'] as const).map((d) => (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4,1fr)',
+                        gap: '8px',
+                        marginTop: '4px',
+                      }}
+                    >
+                      {(['easy', 'medium', 'hard', 'mixed'] as const).map(d => (
                         <button
                           key={d}
                           onClick={() => setExamDifficulty(d)}
@@ -1752,16 +2419,27 @@ function App() {
                           style={{
                             padding: '8px 4px',
                             borderRadius: '8px',
-                            border: examDifficulty === d ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                            background: examDifficulty === d ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.02)',
-                            color: examDifficulty === d ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                            border:
+                              examDifficulty === d
+                                ? '1px solid var(--accent-primary)'
+                                : '1px solid var(--border-color)',
+                            background:
+                              examDifficulty === d
+                                ? 'rgba(99,102,241,0.12)'
+                                : 'rgba(255,255,255,0.02)',
+                            color:
+                              examDifficulty === d
+                                ? 'var(--accent-primary)'
+                                : 'var(--text-secondary)',
                             fontWeight: examDifficulty === d ? 700 : 400,
                             cursor: isStartingSession ? 'not-allowed' : 'pointer',
                             fontSize: '0.8rem',
                             textTransform: 'capitalize',
-                            transition: 'all 0.15s ease'
+                            transition: 'all 0.15s ease',
                           }}
-                        >{d}</button>
+                        >
+                          {d}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1774,7 +2452,15 @@ function App() {
 
                     {/* Available tags from DB */}
                     {availableTags.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', marginTop: '4px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                          marginBottom: '8px',
+                          marginTop: '4px',
+                        }}
+                      >
                         {availableTags.map(t => (
                           <button
                             key={t}
@@ -1784,13 +2470,22 @@ function App() {
                               padding: '3px 10px',
                               borderRadius: '20px',
                               border: '1px solid var(--border-color)',
-                              background: examTagFilters.includes(t) ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
-                              color: examTagFilters.includes(t) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                              background: examTagFilters.includes(t)
+                                ? 'rgba(99,102,241,0.15)'
+                                : 'rgba(255,255,255,0.03)',
+                              color: examTagFilters.includes(t)
+                                ? 'var(--accent-primary)'
+                                : 'var(--text-secondary)',
                               fontSize: '0.75rem',
-                              cursor: examTagFilters.includes(t) || isStartingSession ? 'default' : 'pointer',
-                              transition: 'all 0.15s'
+                              cursor:
+                                examTagFilters.includes(t) || isStartingSession
+                                  ? 'default'
+                                  : 'pointer',
+                              transition: 'all 0.15s',
                             }}
-                          >{t}</button>
+                          >
+                            {t}
+                          </button>
                         ))}
                       </div>
                     )}
@@ -1801,32 +2496,68 @@ function App() {
                         type="text"
                         placeholder="Type a tag and press Enter..."
                         value={examTagInput}
-                        onChange={(e) => setExamTagInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTagFilter(examTagInput); } }}
+                        onChange={e => setExamTagInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addTagFilter(examTagInput);
+                          }
+                        }}
                         disabled={isStartingSession}
-                        style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', borderRadius: '6px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          fontSize: '0.82rem',
+                          borderRadius: '6px',
+                          background: 'rgba(0,0,0,0.2)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                        }}
                       />
                       <button
                         onClick={() => addTagFilter(examTagInput)}
                         disabled={!examTagInput.trim() || isStartingSession}
                         className="btn btn-secondary"
                         style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '0.82rem' }}
-                      ><Plus size={14} /></button>
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
 
                     {/* Active filter chips */}
                     {examTagFilters.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}
+                      >
                         {examTagFilters.map(t => (
-                          <span key={t} style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '3px 10px', borderRadius: '20px',
-                            background: 'rgba(99,102,241,0.15)',
-                            border: '1px solid rgba(99,102,241,0.3)',
-                            color: 'var(--accent-primary)', fontSize: '0.75rem'
-                          }}>
+                          <span
+                            key={t}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 10px',
+                              borderRadius: '20px',
+                              background: 'rgba(99,102,241,0.15)',
+                              border: '1px solid rgba(99,102,241,0.3)',
+                              color: 'var(--accent-primary)',
+                              fontSize: '0.75rem',
+                            }}
+                          >
                             {t}
-                            <button onClick={() => removeTagFilter(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', display: 'flex', padding: 0 }}><X size={12} /></button>
+                            <button
+                              onClick={() => removeTagFilter(t)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--accent-primary)',
+                                display: 'flex',
+                                padding: 0,
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
                           </span>
                         ))}
                       </div>
@@ -1839,34 +2570,106 @@ function App() {
                     onClick={handleStartExamSession}
                     disabled={isStartingSession || !selectedTopic || topics.length === 0}
                     className="btn btn-primary"
-                    style={{ width: '100%', gap: '8px', background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)' }}
+                    style={{
+                      width: '100%',
+                      gap: '8px',
+                      background:
+                        'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                    }}
                   >
                     {isStartingSession ? (
-                      <><Loader2 size={16} className="animate-spin" /><span>Initializing session...</span></>
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Initializing session...</span>
+                      </>
                     ) : (
-                      <><Sparkles size={16} /><span>Start {examMode === 'timed' ? 'Timed' : 'Practice'} Session ({examCount} Qs)</span></>
+                      <>
+                        <Sparkles size={16} />
+                        <span>
+                          Start {examMode === 'timed' ? 'Timed' : 'Practice'} Session ({examCount}{' '}
+                          Qs)
+                        </span>
+                      </>
                     )}
                   </button>
                 </div>
 
                 {/* Right — Summary / Hints */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ padding: '20px', background: 'rgba(99,102,241,0.05)', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.15)' }}>
-                    <h4 style={{ margin: '0 0 12px', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}><BookOpen size={16} /> How it works</h4>
-                    <ol style={{ paddingLeft: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.8, margin: 0 }}>
-                      <li>Matches questions from your **permanent question bank** using your difficulty and concept filters.</li>
-                      <li>Loads them into an active simulation container, freezing ordering to log details.</li>
-                      <li>**Practice Mode** gives immediate explanations and corrections after you select options.</li>
-                      <li>**Timed Exam** hides answers, running a countdown. Concluding the session generates a score.</li>
+                  <div
+                    style={{
+                      padding: '20px',
+                      background: 'rgba(99,102,241,0.05)',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(99,102,241,0.15)',
+                    }}
+                  >
+                    <h4
+                      style={{
+                        margin: '0 0 12px',
+                        color: 'var(--accent-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <BookOpen size={16} /> How it works
+                    </h4>
+                    <ol
+                      style={{
+                        paddingLeft: '16px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        lineHeight: 1.8,
+                        margin: 0,
+                      }}
+                    >
+                      <li>
+                        Matches questions from your **permanent question bank** using your
+                        difficulty and concept filters.
+                      </li>
+                      <li>
+                        Loads them into an active simulation container, freezing ordering to log
+                        details.
+                      </li>
+                      <li>
+                        **Practice Mode** gives immediate explanations and corrections after you
+                        select options.
+                      </li>
+                      <li>
+                        **Timed Exam** hides answers, running a countdown. Concluding the session
+                        generates a score.
+                      </li>
                     </ol>
                   </div>
 
-                  <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Question Bank Status</strong>
+                  <div
+                    style={{
+                      padding: '16px',
+                      background: 'rgba(255,255,255,0.02)',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      Question Bank Status
+                    </strong>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                      <strong style={{ color: 'var(--text-secondary)' }}>Topic:</strong> {selectedTopic?.name || '—'}<br />
-                      <strong style={{ color: 'var(--text-secondary)' }}>Documents ingested:</strong> {documents.filter(d => d.status === 'parsed').length} / {documents.length}<br />
-                      <strong style={{ color: 'var(--text-secondary)' }}>Available tags:</strong> {availableTags.length}
+                      <strong style={{ color: 'var(--text-secondary)' }}>Topic:</strong>{' '}
+                      {selectedTopic?.name || '—'}
+                      <br />
+                      <strong style={{ color: 'var(--text-secondary)' }}>
+                        Documents ingested:
+                      </strong>{' '}
+                      {documents.filter(d => d.status === 'parsed').length} / {documents.length}
+                      <br />
+                      <strong style={{ color: 'var(--text-secondary)' }}>
+                        Available tags:
+                      </strong>{' '}
+                      {availableTags.length}
                     </p>
                     <button
                       onClick={handleGenerateAllQuestions}
@@ -1879,7 +2682,7 @@ function App() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px'
+                        gap: '6px',
                       }}
                     >
                       {isGeneratingAllQuestions ? (
@@ -1903,176 +2706,282 @@ function App() {
 
         {/* Active Exam Simulation Container */}
         {activeTab === 'exam' && activeSession && (
-          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div
+            className="fade-in"
+            style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}
+          >
             {/* Header: Mode, Timer, Progress */}
-            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+            <div
+              className="glass-card"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 24px',
+              }}
+            >
               <div>
-                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent-primary)', fontWeight: 700 }}>
-                  Exam in Progress ({activeSession.mode === 'timed' ? 'Timed Session' : 'Practice Session'})
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    textTransform: 'uppercase',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 700,
+                  }}
+                >
+                  Exam in Progress (
+                  {activeSession.mode === 'timed' ? 'Timed Session' : 'Practice Session'})
                 </span>
                 <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem' }}>{selectedTopic?.name}</h3>
               </div>
-              
+
               {activeSession.mode === 'timed' && examTimeRemaining !== null && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Clock size={20} color={examTimeRemaining < 60 ? '#ef4444' : 'var(--text-secondary)'} />
-                  <span style={{ 
-                    fontSize: '1.4rem', 
-                    fontFamily: 'monospace', 
-                    fontWeight: 700, 
-                    color: examTimeRemaining < 60 ? '#ef4444' : 'var(--text-primary)' 
-                  }}>
-                    {Math.floor(examTimeRemaining / 60)}:{(examTimeRemaining % 60).toString().padStart(2, '0')}
+                  <Clock
+                    size={20}
+                    color={examTimeRemaining < 60 ? '#ef4444' : 'var(--text-secondary)'}
+                  />
+                  <span
+                    style={{
+                      fontSize: '1.4rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      color: examTimeRemaining < 60 ? '#ef4444' : 'var(--text-primary)',
+                    }}
+                  >
+                    {Math.floor(examTimeRemaining / 60)}:
+                    {(examTimeRemaining % 60).toString().padStart(2, '0')}
                   </span>
                 </div>
               )}
             </div>
 
             {/* Timer Progress Bar */}
-            {activeSession.mode === 'timed' && examTimeRemaining !== null && activeSession.time_limit_seconds && (
-              <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '-12px' }}>
-                <div style={{
-                  height: '100%',
-                  width: `${(examTimeRemaining / activeSession.time_limit_seconds) * 100}%`,
-                  background: examTimeRemaining < 60 ? '#ef4444' : 'var(--accent-primary)',
-                  transition: 'width 1s linear'
-                }} />
-              </div>
-            )}
+            {activeSession.mode === 'timed' &&
+              examTimeRemaining !== null &&
+              activeSession.time_limit_seconds && (
+                <div
+                  style={{
+                    height: '4px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '2px',
+                    overflow: 'hidden',
+                    marginTop: '-12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${(examTimeRemaining / activeSession.time_limit_seconds) * 100}%`,
+                      background: examTimeRemaining < 60 ? '#ef4444' : 'var(--accent-primary)',
+                      transition: 'width 1s linear',
+                    }}
+                  />
+                </div>
+              )}
 
             {/* Split layout: Question Card & Navigation Shell */}
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px', alignItems: 'start' }}>
-              
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '3fr 1fr',
+                gap: '24px',
+                alignItems: 'start',
+              }}
+            >
               {/* Question Card */}
               {sessionQuestions.length > 0 && currentQuestionIndex < sessionQuestions.length && (
-                <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div
+                  className="glass-card"
+                  style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}
+                >
                   {/* Card Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderBottom: '1px solid var(--border-color)',
+                      paddingBottom: '16px',
+                    }}
+                  >
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                       Question {currentQuestionIndex + 1} of {sessionQuestions.length}
                     </span>
-                    <span style={{ 
-                      padding: '3px 10px', 
-                      borderRadius: '12px', 
-                      fontSize: '0.72rem', 
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                      background: sessionQuestions[currentQuestionIndex].difficulty === 'easy' ? 'rgba(20,184,166,0.1)' 
-                        : sessionQuestions[currentQuestionIndex].difficulty === 'hard' ? 'rgba(239,68,68,0.1)'
-                        : 'rgba(168,85,247,0.1)',
-                      color: sessionQuestions[currentQuestionIndex].difficulty === 'easy' ? 'var(--accent-teal)' 
-                        : sessionQuestions[currentQuestionIndex].difficulty === 'hard' ? '#ef4444'
-                        : 'var(--accent-secondary)'
-                    }}>
+                    <span
+                      style={{
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        textTransform: 'capitalize',
+                        background:
+                          sessionQuestions[currentQuestionIndex].difficulty === 'easy'
+                            ? 'rgba(20,184,166,0.1)'
+                            : sessionQuestions[currentQuestionIndex].difficulty === 'hard'
+                              ? 'rgba(239,68,68,0.1)'
+                              : 'rgba(168,85,247,0.1)',
+                        color:
+                          sessionQuestions[currentQuestionIndex].difficulty === 'easy'
+                            ? 'var(--accent-teal)'
+                            : sessionQuestions[currentQuestionIndex].difficulty === 'hard'
+                              ? '#ef4444'
+                              : 'var(--accent-secondary)',
+                      }}
+                    >
                       {sessionQuestions[currentQuestionIndex].difficulty}
                     </span>
                   </div>
 
                   {/* Question Text */}
-                  <p style={{ fontSize: '1.1rem', fontWeight: 600, lineHeight: 1.6, color: 'var(--text-primary)', margin: 0 }}>
+                  <p
+                    style={{
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      lineHeight: 1.6,
+                      color: 'var(--text-primary)',
+                      margin: 0,
+                    }}
+                  >
                     {sessionQuestions[currentQuestionIndex].question_text}
                   </p>
 
                   {/* Question Options */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {sessionQuestions[currentQuestionIndex].options
-                      .map((opt: any) => {
-                        const qid = sessionQuestions[currentQuestionIndex].id;
-                        const isSelected = selectedAnswers[qid] === opt.id;
-                        
-                        // Practice feedback styles
-                        const feedback = practiceFeedback[qid];
-                        const showCorrectness = feedback !== undefined;
-                        const isCorrectOption = showCorrectness && feedback.correctOptionId === opt.id;
-                        const isSelectedIncorrect = showCorrectness && isSelected && !feedback.isCorrect;
+                    {sessionQuestions[currentQuestionIndex].options.map((opt: any) => {
+                      const qid = sessionQuestions[currentQuestionIndex].id;
+                      const isSelected = selectedAnswers[qid] === opt.id;
 
-                        let bg = 'rgba(255,255,255,0.02)';
-                        let border = '1px solid var(--border-color)';
-                        let color = 'var(--text-secondary)';
+                      // Practice feedback styles
+                      const feedback = practiceFeedback[qid];
+                      const showCorrectness = feedback !== undefined;
+                      const isCorrectOption =
+                        showCorrectness && feedback.correctOptionId === opt.id;
+                      const isSelectedIncorrect =
+                        showCorrectness && isSelected && !feedback.isCorrect;
 
-                        if (isSelected && !showCorrectness) {
-                          bg = 'rgba(99, 102, 241, 0.12)';
-                          border = '1px solid var(--accent-primary)';
-                          color = 'var(--accent-primary)';
-                        } else if (isCorrectOption) {
-                          bg = 'rgba(20, 184, 166, 0.12)';
-                          border = '1px solid rgba(20, 184, 166, 0.4)';
-                          color = 'var(--accent-teal)';
-                        } else if (isSelectedIncorrect) {
-                          bg = 'rgba(239, 68, 68, 0.12)';
-                          border = '1px solid rgba(239, 68, 68, 0.4)';
-                          color = '#ef4444';
-                        }
+                      let bg = 'rgba(255,255,255,0.02)';
+                      let border = '1px solid var(--border-color)';
+                      let color = 'var(--text-secondary)';
 
-                        return (
-                          <button
-                            key={opt.id}
-                            disabled={showCorrectness || isSubmittingAnswer[qid]}
-                            onClick={() => handleSelectOption(qid, opt.id)}
+                      if (isSelected && !showCorrectness) {
+                        bg = 'rgba(99, 102, 241, 0.12)';
+                        border = '1px solid var(--accent-primary)';
+                        color = 'var(--accent-primary)';
+                      } else if (isCorrectOption) {
+                        bg = 'rgba(20, 184, 166, 0.12)';
+                        border = '1px solid rgba(20, 184, 166, 0.4)';
+                        color = 'var(--accent-teal)';
+                      } else if (isSelectedIncorrect) {
+                        bg = 'rgba(239, 68, 68, 0.12)';
+                        border = '1px solid rgba(239, 68, 68, 0.4)';
+                        color = '#ef4444';
+                      }
+
+                      return (
+                        <button
+                          key={opt.id}
+                          disabled={showCorrectness || isSubmittingAnswer[qid]}
+                          onClick={() => handleSelectOption(qid, opt.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '16px 20px',
+                            borderRadius: '10px',
+                            background: bg,
+                            border: border,
+                            color: color,
+                            cursor:
+                              showCorrectness || isSubmittingAnswer[qid] ? 'default' : 'pointer',
+                            textAlign: 'left',
+                            fontSize: '0.95rem',
+                            fontWeight: isSelected ? 600 : 400,
+                            transition: 'all 0.15s ease',
+                            width: '100%',
+                          }}
+                        >
+                          <span
                             style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '12px',
-                              padding: '16px 20px',
-                              borderRadius: '10px',
-                              background: bg,
-                              border: border,
-                              color: color,
-                              cursor: (showCorrectness || isSubmittingAnswer[qid]) ? 'default' : 'pointer',
-                              textAlign: 'left',
-                              fontSize: '0.95rem',
-                              fontWeight: isSelected ? 600 : 400,
-                              transition: 'all 0.15s ease',
-                              width: '100%'
-                            }}
-                          >
-                            <span style={{ 
-                              width: '24px', 
-                              height: '24px', 
-                              borderRadius: '50%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
+                              justifyContent: 'center',
                               fontSize: '0.8rem',
                               fontWeight: 700,
-                              background: isSelected ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                              background: isSelected
+                                ? 'var(--accent-primary)'
+                                : 'rgba(255,255,255,0.05)',
                               color: isSelected ? '#ffffff' : 'var(--text-muted)',
-                              flexShrink: 0
-                            }}>
-                              {String.fromCharCode(65 + opt.option_order)}
-                            </span>
-                            <span style={{ flex: 1 }}>{opt.option_text}</span>
-                            {isCorrectOption && <CheckCircle2 size={18} color="var(--accent-teal)" style={{ flexShrink: 0 }} />}
-                            {isSelectedIncorrect && <X size={18} color="#ef4444" style={{ flexShrink: 0 }} />}
-                          </button>
-                        );
-                      })
-                    }
+                              flexShrink: 0,
+                            }}
+                          >
+                            {String.fromCharCode(65 + opt.option_order)}
+                          </span>
+                          <span style={{ flex: 1 }}>{opt.option_text}</span>
+                          {isCorrectOption && (
+                            <CheckCircle2
+                              size={18}
+                              color="var(--accent-teal)"
+                              style={{ flexShrink: 0 }}
+                            />
+                          )}
+                          {isSelectedIncorrect && (
+                            <X size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Immediate Explanation (Practice Mode only, after answering) */}
-                  {examMode === 'practice' && practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (
-                    <div className="fade-in" style={{ 
-                      padding: '16px 20px', 
-                      background: 'rgba(99,102,241,0.06)', 
-                      borderRadius: '10px', 
-                      border: '1px solid rgba(99,102,241,0.15)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.9rem' }}>
-                        <Sparkles size={16} />
-                        <span>Practice Mode Explanation</span>
+                  {examMode === 'practice' &&
+                    practiceFeedback[sessionQuestions[currentQuestionIndex].id] && (
+                      <div
+                        className="fade-in"
+                        style={{
+                          padding: '16px 20px',
+                          background: 'rgba(99,102,241,0.06)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(99,102,241,0.15)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: 'var(--accent-primary)',
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                          }}
+                        >
+                          <Sparkles size={16} />
+                          <span>Practice Mode Explanation</span>
+                        </div>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '0.88rem',
+                            color: 'var(--text-secondary)',
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {sessionQuestions[currentQuestionIndex].explanation ||
+                            'No explanation provided for this question.'}
+                        </p>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        {sessionQuestions[currentQuestionIndex].explanation || "No explanation provided for this question."}
-                      </p>
-                    </div>
-                  )}
+                    )}
 
                   {/* Action Buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}
+                  >
                     <button
                       disabled={currentQuestionIndex === 0}
                       onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
@@ -2081,7 +2990,7 @@ function App() {
                     >
                       Previous
                     </button>
-                    
+
                     {currentQuestionIndex < sessionQuestions.length - 1 ? (
                       <button
                         onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
@@ -2094,24 +3003,40 @@ function App() {
                       <button
                         onClick={handleCompleteExam}
                         className="btn btn-primary"
-                        style={{ padding: '10px 24px', background: 'linear-gradient(135deg, var(--accent-teal) 0%, var(--accent-primary) 100%)' }}
+                        style={{
+                          padding: '10px 24px',
+                          background:
+                            'linear-gradient(135deg, var(--accent-teal) 0%, var(--accent-primary) 100%)',
+                        }}
                       >
                         Conclude Exam
                       </button>
                     )}
                   </div>
-
                 </div>
               )}
 
               {/* Navigation Shell */}
-              <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div
+                className="glass-card"
+                style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    fontSize: '0.9rem',
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
                   Question Navigation
                 </h4>
-                
+
                 {/* Question Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}
+                >
                   {sessionQuestions.map((q, idx) => {
                     const isCurrent = idx === currentQuestionIndex;
                     const isAnswered = selectedAnswers[q.id] !== undefined;
@@ -2146,7 +3071,7 @@ function App() {
                           border: border,
                           color: color,
                           cursor: 'pointer',
-                          transition: 'all 0.15s'
+                          transition: 'all 0.15s',
                         }}
                       >
                         {idx + 1}
@@ -2155,13 +3080,54 @@ function App() {
                   })}
                 </div>
 
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(20, 184, 166, 0.2)', border: '1px solid var(--accent-teal)' }}></div>
+                <div
+                  style={{
+                    borderTop: '1px solid var(--border-color)',
+                    paddingTop: '16px',
+                    marginTop: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '2px',
+                        background: 'rgba(20, 184, 166, 0.2)',
+                        border: '1px solid var(--accent-teal)',
+                      }}
+                    ></div>
                     <span>Answered</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}></div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.78rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '2px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid var(--border-color)',
+                      }}
+                    ></div>
                     <span>Unanswered</span>
                   </div>
                 </div>
@@ -2169,168 +3135,366 @@ function App() {
                 <button
                   onClick={handleCompleteExam}
                   className="btn btn-primary"
-                  style={{ width: '100%', marginTop: '16px', background: '#ef4444', border: 'none' }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                  style={{
+                    width: '100%',
+                    marginTop: '16px',
+                    background: '#ef4444',
+                    border: 'none',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                 >
                   Conclude & Submit
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
         {/* Results Screen & Scorecard */}
         {activeTab === 'results' && (
-          <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            
+          <div
+            className="fade-in"
+            style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}
+          >
             {sessionCompletedResults ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 {/* Scorecard Hero Banner */}
-                <div className="glass-card" style={{ 
-                  background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%)',
-                  border: '1px solid rgba(20, 184, 166, 0.25)',
-                  padding: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-around',
-                  borderRadius: '16px',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
+                <div
+                  className="glass-card"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%)',
+                    border: '1px solid rgba(20, 184, 166, 0.25)',
+                    padding: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-around',
+                    borderRadius: '16px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
                   {/* Left Hero Details */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 2 }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--accent-teal)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--accent-teal)',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
                       Performance Report Card
                     </span>
-                    <h2 style={{ margin: 0, fontSize: '2.2rem', fontFamily: 'var(--font-display)' }}>Exam Completed!</h2>
-                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '400px' }}>
-                      Great work! Review your question attempts and explanations below to strengthen your weak concepts.
+                    <h2
+                      style={{ margin: 0, fontSize: '2.2rem', fontFamily: 'var(--font-display)' }}
+                    >
+                      Exam Completed!
+                    </h2>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: 'var(--text-secondary)',
+                        fontSize: '1.05rem',
+                        maxWidth: '400px',
+                      }}
+                    >
+                      Great work! Review your question attempts and explanations below to strengthen
+                      your weak concepts.
                     </p>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                      <button onClick={() => { setSessionCompletedResults(null); setActiveTab('exam'); }} className="btn btn-primary" style={{ background: 'var(--accent-teal)' }}>
+                      <button
+                        onClick={() => {
+                          setSessionCompletedResults(null);
+                          setActiveTab('exam');
+                        }}
+                        className="btn btn-primary"
+                        style={{ background: 'var(--accent-teal)' }}
+                      >
                         Take Another Exam
                       </button>
                     </div>
                   </div>
 
                   {/* Circular Score Visual Indicator */}
-                  <div style={{ 
-                    width: '180px', 
-                    height: '180px', 
-                    borderRadius: '50%', 
-                    background: 'radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%)',
-                    border: '8px solid rgba(255,255,255,0.03)',
-                    borderTopColor: 'var(--accent-teal)',
-                    borderRightColor: sessionCompletedResults.score >= 50 ? 'var(--accent-teal)' : 'rgba(255,255,255,0.03)',
-                    borderBottomColor: sessionCompletedResults.score >= 75 ? 'var(--accent-teal)' : 'rgba(255,255,255,0.03)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 2,
-                    boxShadow: '0 0 40px rgba(20, 184, 166, 0.2)'
-                  }}>
-                    <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>
+                  <div
+                    style={{
+                      width: '180px',
+                      height: '180px',
+                      borderRadius: '50%',
+                      background:
+                        'radial-gradient(circle, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%)',
+                      border: '8px solid rgba(255,255,255,0.03)',
+                      borderTopColor: 'var(--accent-teal)',
+                      borderRightColor:
+                        sessionCompletedResults.score >= 50
+                          ? 'var(--accent-teal)'
+                          : 'rgba(255,255,255,0.03)',
+                      borderBottomColor:
+                        sessionCompletedResults.score >= 75
+                          ? 'var(--accent-teal)'
+                          : 'rgba(255,255,255,0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 2,
+                      boxShadow: '0 0 40px rgba(20, 184, 166, 0.2)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '2.8rem',
+                        fontWeight: 800,
+                        color: '#ffffff',
+                        lineHeight: 1,
+                      }}
+                    >
                       {sessionCompletedResults.score}%
                     </span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginTop: '6px',
+                      }}
+                    >
                       Correct Rate
                     </span>
                   </div>
                 </div>
 
                 {/* Score Stats Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px' }}>
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px' }}
+                >
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Session Mode</span>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--accent-primary)' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Session Mode
+                    </span>
+                    <p
+                      style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        textTransform: 'capitalize',
+                        color: 'var(--accent-primary)',
+                      }}
+                    >
                       {sessionCompletedResults.mode}
                     </p>
                   </div>
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Questions</span>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Total Questions
+                    </span>
+                    <p
+                      style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
                       {sessionCompletedResults.question_count}
                     </p>
                   </div>
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Correct Answers</span>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-teal)' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Correct Answers
+                    </span>
+                    <p
+                      style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-teal)',
+                      }}
+                    >
                       {sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
                     </p>
                   </div>
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Incorrect/Skipped</span>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#ef4444' }}>
-                      {sessionCompletedResults.question_count - sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Incorrect/Skipped
+                    </span>
+                    <p
+                      style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: '#ef4444',
+                      }}
+                    >
+                      {sessionCompletedResults.question_count -
+                        sessionCompletedResults.responses.filter((r: any) => r.is_correct).length}
                     </p>
                   </div>
                   <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Average Speed</span>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-secondary)' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Average Speed
+                    </span>
+                    <p
+                      style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '1.25rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-secondary)',
+                      }}
+                    >
                       {resultsMetrics ? `${resultsMetrics.average_time_taken_seconds}s` : '—'}
                     </p>
                   </div>
                 </div>
 
                 {/* Concept Mastery Heatmap & Practice Weak Areas Card (Phase 7) */}
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div
+                  className="glass-card"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '16px',
+                    }}
+                  >
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: '1.4rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                        }}
+                      >
                         <Sparkles size={20} color="var(--accent-primary)" />
                         Concept Mastery Heatmap
                       </h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                        Track your topic performance per concept tag. Strong concepts are in green, weak ones require review.
-                      </p>
-                    </div>
-                    
-                    {/* Practice Weak Areas Button */}
-                    {resultsMetrics && resultsMetrics.tag_performance && resultsMetrics.tag_performance.some((t: any) => t.percentage < 75) && (
-                      <button
-                        onClick={handlePracticeWeakAreas}
-                        disabled={isGeneratingWeakAreaQuestions}
-                        className="btn btn-primary"
+                      <p
                         style={{
-                          background: 'linear-gradient(135deg, #ef4444 0%, var(--accent-secondary) 100%)',
-                          boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '10px 20px',
-                          fontSize: '0.9rem',
-                          fontWeight: 700
+                          margin: '4px 0 0 0',
+                          fontSize: '0.88rem',
+                          color: 'var(--text-secondary)',
                         }}
                       >
-                        {isGeneratingWeakAreaQuestions ? (
-                          <>
-                            <Loader2 size={16} className="animate-spin" />
-                            <span>Generating Targeted MCQs...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={16} />
-                            <span>Practice Weak Areas ({resultsMetrics.tag_performance.filter((t: any) => t.percentage < 75).length})</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                        Track your topic performance per concept tag. Strong concepts are in green,
+                        weak ones require review.
+                      </p>
+                    </div>
+
+                    {/* Practice Weak Areas Button */}
+                    {resultsMetrics &&
+                      resultsMetrics.tag_performance &&
+                      resultsMetrics.tag_performance.some((t: any) => t.percentage < 75) && (
+                        <button
+                          onClick={handlePracticeWeakAreas}
+                          disabled={isGeneratingWeakAreaQuestions}
+                          className="btn btn-primary"
+                          style={{
+                            background:
+                              'linear-gradient(135deg, #ef4444 0%, var(--accent-secondary) 100%)',
+                            boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 20px',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {isGeneratingWeakAreaQuestions ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              <span>Generating Targeted MCQs...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles size={16} />
+                              <span>
+                                Practice Weak Areas (
+                                {
+                                  resultsMetrics.tag_performance.filter(
+                                    (t: any) => t.percentage < 75
+                                  ).length
+                                }
+                                )
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      )}
                   </div>
 
                   {isLoadingMetrics ? (
-                    <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', color: 'var(--text-secondary)' }}>
+                    <div
+                      style={{
+                        padding: '24px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '10px',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
                       <Loader2 size={20} className="animate-spin" />
                       <span>Loading concept metrics...</span>
                     </div>
-                  ) : !resultsMetrics || !resultsMetrics.tag_performance || resultsMetrics.tag_performance.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                  ) : !resultsMetrics ||
+                    !resultsMetrics.tag_performance ||
+                    resultsMetrics.tag_performance.length === 0 ? (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '0.9rem',
+                        color: 'var(--text-muted)',
+                        textAlign: 'center',
+                        padding: '16px',
+                      }}
+                    >
                       No tags or concept data available for this session's questions.
                     </p>
                   ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '8px' }}>
+                    <div
+                      style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '8px' }}
+                    >
                       {resultsMetrics.tag_performance.map((tag: any) => {
                         const pct = tag.percentage;
                         let bg = 'rgba(255, 255, 255, 0.02)';
@@ -2374,44 +3538,75 @@ function App() {
                               flex: '1 1 calc(25% - 12px)',
                               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               transition: 'all 0.2s ease-in-out',
-                              cursor: 'default'
+                              cursor: 'default',
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={e => {
                               e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2)';
+                              e.currentTarget.style.boxShadow =
+                                '0 10px 15px -3px rgba(0, 0, 0, 0.2)';
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={e => {
                               e.currentTarget.style.transform = 'translateY(0)';
                               e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: 700,
+                                  color: 'var(--text-primary)',
+                                  textTransform: 'capitalize',
+                                }}
+                              >
                                 {tag.tag_name}
                               </span>
                               <BadgeIcon size={14} color={color} />
                             </div>
-                            
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
+
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-end',
+                                marginTop: '4px',
+                              }}
+                            >
                               <div>
-                                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
+                                <span
+                                  style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}
+                                >
                                   {pct}%
                                 </span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: 'var(--text-muted)',
+                                    display: 'block',
+                                  }}
+                                >
                                   {tag.correct_count} / {tag.total_questions} correct
                                 </span>
                               </div>
-                              <span style={{
-                                fontSize: '0.65rem',
-                                fontWeight: 700,
-                                padding: '2px 8px',
-                                borderRadius: '20px',
-                                background: bg,
-                                border: `1px solid ${color}`,
-                                color: color,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
-                              }}>
+                              <span
+                                style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  padding: '2px 8px',
+                                  borderRadius: '20px',
+                                  background: bg,
+                                  border: `1px solid ${color}`,
+                                  color: color,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
                                 {badgeText}
                               </span>
                             </div>
@@ -2427,31 +3622,83 @@ function App() {
                   <h3 style={{ margin: 0, fontSize: '1.4rem' }}>Detailed Question Review</h3>
 
                   {sessionCompletedResults.questions.map((q: any, qi: number) => {
-                    const response = sessionCompletedResults.responses.find((r: any) => r.question_id === q.id);
+                    const response = sessionCompletedResults.responses.find(
+                      (r: any) => r.question_id === q.id
+                    );
                     const selectedOptId = response?.selected_option_id;
                     const isCorrect = response?.is_correct || false;
                     const correctOptId = response?.correct_option_id;
 
                     return (
-                      <div key={q.id} className="glass-card" style={{ padding: '24px', borderLeft: isCorrect ? '4px solid var(--accent-teal)' : '4px solid #ef4444' }}>
-                        
+                      <div
+                        key={q.id}
+                        className="glass-card"
+                        style={{
+                          padding: '24px',
+                          borderLeft: isCorrect
+                            ? '4px solid var(--accent-teal)'
+                            : '4px solid #ef4444',
+                        }}
+                      >
                         {/* Header Details */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Q{qi + 1} Review</span>
-                          <span style={{ 
-                            fontSize: '0.78rem', padding: '3px 10px', borderRadius: '12px', fontWeight: 600,
-                            background: isCorrect ? 'rgba(20,184,166,0.1)' : 'rgba(239,68,68,0.1)',
-                            color: isCorrect ? 'var(--accent-teal)' : '#ef4444'
-                          }}>
-                            {isCorrect ? 'Correct' : selectedOptId ? 'Incorrect' : 'Skipped / Unanswered'}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '12px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '0.8rem',
+                              color: 'var(--text-muted)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Q{qi + 1} Review
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.78rem',
+                              padding: '3px 10px',
+                              borderRadius: '12px',
+                              fontWeight: 600,
+                              background: isCorrect
+                                ? 'rgba(20,184,166,0.1)'
+                                : 'rgba(239,68,68,0.1)',
+                              color: isCorrect ? 'var(--accent-teal)' : '#ef4444',
+                            }}
+                          >
+                            {isCorrect
+                              ? 'Correct'
+                              : selectedOptId
+                                ? 'Incorrect'
+                                : 'Skipped / Unanswered'}
                           </span>
                         </div>
 
                         {/* Question Text */}
-                        <p style={{ margin: '0 0 16px 0', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{q.question_text}</p>
+                        <p
+                          style={{
+                            margin: '0 0 16px 0',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                          }}
+                        >
+                          {q.question_text}
+                        </p>
 
                         {/* Options */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            marginBottom: '16px',
+                          }}
+                        >
                           {q.options.map((opt: any) => {
                             const isSelected = selectedOptId === opt.id;
                             const isCorrectOpt = correctOptId === opt.id;
@@ -2475,30 +3722,44 @@ function App() {
                             }
 
                             return (
-                              <div key={opt.id} style={{
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '12px 16px', borderRadius: '8px',
-                                background: bg, border: border, color: color,
-                                fontSize: '0.9rem'
-                              }}>
-                                <span style={{
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
+                              <div
+                                key={opt.id}
+                                style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  background: isSelected ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.2)',
-                                  color: 'inherit',
-                                  textAlign: 'center',
-                                  flexShrink: 0
-                                }}>
+                                  gap: '10px',
+                                  padding: '12px 16px',
+                                  borderRadius: '8px',
+                                  background: bg,
+                                  border: border,
+                                  color: color,
+                                  fontSize: '0.9rem',
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background: isSelected
+                                      ? 'rgba(255,255,255,0.1)'
+                                      : 'rgba(0,0,0,0.2)',
+                                    color: 'inherit',
+                                    textAlign: 'center',
+                                    flexShrink: 0,
+                                  }}
+                                >
                                   {String.fromCharCode(65 + opt.option_order)}
                                 </span>
                                 <span style={{ flex: 1 }}>{opt.option_text}</span>
-                                {isCorrectOpt && <CheckCircle2 size={16} color="var(--accent-teal)" />}
+                                {isCorrectOpt && (
+                                  <CheckCircle2 size={16} color="var(--accent-teal)" />
+                                )}
                                 {isSelected && !isCorrectOpt && <X size={16} color="#ef4444" />}
                               </div>
                             );
@@ -2507,9 +3768,26 @@ function App() {
 
                         {/* Explanation block */}
                         {q.explanation && (
-                          <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                              <strong style={{ color: 'var(--accent-primary)' }}>Explanation:</strong> {q.explanation}
+                          <div
+                            style={{
+                              padding: '12px 16px',
+                              background: 'rgba(255,255,255,0.02)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: '0.85rem',
+                                color: 'var(--text-secondary)',
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              <strong style={{ color: 'var(--accent-primary)' }}>
+                                Explanation:
+                              </strong>{' '}
+                              {q.explanation}
                             </p>
                           </div>
                         )}
@@ -2520,12 +3798,25 @@ function App() {
               </div>
             ) : (
               <div className="glass-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
-                <TrendingUp size={48} color="var(--accent-secondary)" style={{ marginBottom: '16px' }} />
+                <TrendingUp
+                  size={48}
+                  color="var(--accent-secondary)"
+                  style={{ marginBottom: '16px' }}
+                />
                 <h2 style={{ marginBottom: '12px' }}>No attempt records found</h2>
-                <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 24px' }}>
-                  Complete your first exam practice or simulation to populate metrics, score breakdowns, and tag correctness reports on this dashboard.
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    maxWidth: '500px',
+                    margin: '0 auto 24px',
+                  }}
+                >
+                  Complete your first exam practice or simulation to populate metrics, score
+                  breakdowns, and tag correctness reports on this dashboard.
                 </p>
-                <button onClick={() => setActiveTab('exam')} className="btn btn-secondary">Prepare First Exam</button>
+                <button onClick={() => setActiveTab('exam')} className="btn btn-secondary">
+                  Prepare First Exam
+                </button>
               </div>
             )}
           </div>

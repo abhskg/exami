@@ -6,9 +6,10 @@ GET  /api/exams/sessions/{id}            — Get detailed status of exam session
 POST /api/exams/sessions/{id}/submit-answer — Record answer submission and validate timed rules
 POST /api/exams/sessions/{id}/complete       — Conclude exam session and compile results
 """
+
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,20 +20,20 @@ logger = logging.getLogger(__name__)
 
 from app.api.auth_dependencies import get_current_user
 from app.core.database import get_db
-from app.models.user import User
-from app.models.topic import Topic
+from app.models.exam import ExamResponse, ExamSession
 from app.models.question import Question, QuestionOption
 from app.models.question_set import QuestionSet, QuestionSetItem
-from app.models.exam import ExamSession, ExamResponse
+from app.models.topic import Topic
+from app.models.user import User
 from app.schemas.exam import (
-    ExamSessionCreate,
-    ExamSessionResponse,
-    ExamQuestionResponse,
     ExamQuestionOptionResponse,
+    ExamQuestionResponse,
     ExamResponseCreate,
     ExamResponseStatus,
-    TagPerformance,
+    ExamSessionCreate,
+    ExamSessionResponse,
     ExamSessionResults,
+    TagPerformance,
 )
 
 router = APIRouter(prefix="/exams", tags=["exams"])
@@ -42,7 +43,7 @@ def _complete_session_internal(session: ExamSession, db: Session) -> None:
     """Closes an active exam session, calculates scores and commits."""
     session.status = "completed"
     now = datetime.now(timezone.utc)
-    
+
     if session.mode == "timed":
         started_utc = session.started_at.replace(tzinfo=timezone.utc)
         expected_end = started_utc + timedelta(seconds=session.time_limit_seconds)
@@ -59,7 +60,9 @@ def _complete_session_internal(session: ExamSession, db: Session) -> None:
 
     db.add(session)
     db.commit()
-    logger.info(f"Exam session {session.id} concluded. Mode: {session.mode}, Score: {session.score}%, Correct: {correct_count}/{session.question_count}")
+    logger.info(
+        f"Exam session {session.id} concluded. Mode: {session.mode}, Score: {session.score}%, Correct: {correct_count}/{session.question_count}"
+    )
 
 
 def _build_session_response(session: ExamSession, db: Session) -> ExamSessionResponse:
@@ -74,7 +77,7 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
 
     questions_out = []
     # Reveal correct answers if session is in practice mode OR completed
-    reveal_answers = (session.mode == "practice" or session.status == "completed")
+    reveal_answers = session.mode == "practice" or session.status == "completed"
     answered_question_ids = {r.question_id for r in session.responses}
 
     for item in items:
@@ -82,13 +85,11 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
         options = sorted(q.options, key=lambda o: o.option_order)
         options_out = [
             ExamQuestionOptionResponse(
-                id=o.id,
-                option_text=o.option_text,
-                option_order=o.option_order
+                id=o.id, option_text=o.option_text, option_order=o.option_order
             )
             for o in options
         ]
-        
+
         tags_list = [tag.name for tag in q.tags]
 
         # Reveal explanation only if session is completed OR in practice mode after answering
@@ -103,7 +104,7 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
                 difficulty=q.difficulty,
                 options=options_out,
                 tags=tags_list,
-                explanation=q.explanation if reveal_q_explanation else None
+                explanation=q.explanation if reveal_q_explanation else None,
             )
         )
 
@@ -118,7 +119,7 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
                 question_id=r.question_id,
                 selected_option_id=r.selected_option_id,
                 is_correct=r.is_correct if reveal_answers else None,
-                correct_option_id=correct_opt_id
+                correct_option_id=correct_opt_id,
             )
         )
 
@@ -145,7 +146,7 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
         completed_at=session.completed_at,
         score=session.score,
         questions=questions_out,
-        responses=responses_out
+        responses=responses_out,
     )
 
 
@@ -162,24 +163,29 @@ def create_exam_session(
     Starts a newTimed or Practice exam session. Matches questions from question
     bank based on filters, saves locked order to a QuestionSet, and creates session.
     """
-    logger.info(f"User {current_user.email} (ID: {current_user.id}) attempting to start exam session for topic {payload.topic_id}. Mode: {payload.mode}, Count: {payload.question_count}")
-    
-    topic = db.query(Topic).filter(
-        Topic.id == payload.topic_id,
-        Topic.user_id == current_user.id
-    ).first()
+    logger.info(
+        f"User {current_user.email} (ID: {current_user.id}) attempting to start exam session for topic {payload.topic_id}. Mode: {payload.mode}, Count: {payload.question_count}"
+    )
+
+    topic = (
+        db.query(Topic)
+        .filter(Topic.id == payload.topic_id, Topic.user_id == current_user.id)
+        .first()
+    )
     if not topic:
-        logger.warning(f"Start exam session failed: Topic {payload.topic_id} not found or access denied for User {current_user.id}")
+        logger.warning(
+            f"Start exam session failed: Topic {payload.topic_id} not found or access denied for User {current_user.id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Topic not found or access denied."
+            detail="Topic not found or access denied.",
         )
 
     # Query matching active questions
     query = db.query(Question).filter(
         Question.user_id == current_user.id,
         Question.topic_id == payload.topic_id,
-        Question.is_active.is_(True)
+        Question.is_active.is_(True),
     )
 
     if payload.difficulty_filter and payload.difficulty_filter.lower() != "mixed":
@@ -187,6 +193,7 @@ def create_exam_session(
 
     if payload.tag_filter:
         from app.models.tag import Tag
+
         tag_names = [t.strip().lower() for t in payload.tag_filter if t.strip()]
         if tag_names:
             query = query.filter(Question.tags.any(Tag.name.in_(tag_names)))
@@ -194,10 +201,12 @@ def create_exam_session(
     questions = query.order_by(func.random()).limit(payload.question_count).all()
 
     if not questions:
-        logger.warning(f"Start exam session failed: No questions found matching filters for topic {payload.topic_id}")
+        logger.warning(
+            f"Start exam session failed: No questions found matching filters for topic {payload.topic_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No questions found matching the selected filters. Please generate questions first."
+            detail="No questions found matching the selected filters. Please generate questions first.",
         )
 
     # Set default time limits
@@ -214,18 +223,14 @@ def create_exam_session(
             "mode": payload.mode,
             "difficulty_filter": payload.difficulty_filter,
             "tag_filter": payload.tag_filter,
-            "question_count": len(questions)
-        }
+            "question_count": len(questions),
+        },
     )
     db.add(qset)
     db.flush()
 
     for idx, q in enumerate(questions):
-        item = QuestionSetItem(
-            question_set_id=qset.id,
-            question_id=q.id,
-            position=idx
-        )
+        item = QuestionSetItem(question_set_id=qset.id, question_id=q.id, position=idx)
         db.add(item)
 
     # Create exam session
@@ -245,7 +250,9 @@ def create_exam_session(
     db.commit()
     db.refresh(session)
 
-    logger.info(f"Exam session {session.id} successfully created with {session.question_count} questions for User {current_user.id}")
+    logger.info(
+        f"Exam session {session.id} successfully created with {session.question_count} questions for User {current_user.id}"
+    )
     return _build_session_response(session, db)
 
 
@@ -260,16 +267,16 @@ def get_exam_session(
 ):
     """Fetches details for an existing exam session, checking timed limits."""
     logger.info(f"User {current_user.email} (ID: {current_user.id}) fetching exam session {id}")
-    session = db.query(ExamSession).filter(
-        ExamSession.id == id,
-        ExamSession.user_id == current_user.id
-    ).first()
+    session = (
+        db.query(ExamSession)
+        .filter(ExamSession.id == id, ExamSession.user_id == current_user.id)
+        .first()
+    )
     if not session:
-        logger.warning(f"Fetch exam session failed: Session {id} not found for User {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam session not found."
+        logger.warning(
+            f"Fetch exam session failed: Session {id} not found for User {current_user.id}"
         )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam session not found.")
 
     # Auto-conclude if timed limits have expired on read
     if session.status == "in_progress" and session.mode == "timed":
@@ -297,25 +304,25 @@ def submit_answer(
     Logs an answer submission to the exam response history. Enforces session state,
     verifies if question is part of the session, and enforces server timed lock boundaries.
     """
-    logger.info(f"User {current_user.email} (ID: {current_user.id}) submitting answer to question {payload.question_id} in session {id}")
-    
-    session = db.query(ExamSession).filter(
-        ExamSession.id == id,
-        ExamSession.user_id == current_user.id
-    ).first()
+    logger.info(
+        f"User {current_user.email} (ID: {current_user.id}) submitting answer to question {payload.question_id} in session {id}"
+    )
+
+    session = (
+        db.query(ExamSession)
+        .filter(ExamSession.id == id, ExamSession.user_id == current_user.id)
+        .first()
+    )
     if not session:
         logger.warning(f"Submit answer failed: Session {id} not found for User {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam session not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam session not found.")
 
     # Block submissions on concluded tests
     if session.status != "in_progress":
         logger.warning(f"Submit answer failed: Session {id} is already completed/locked.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot submit answers. This session is already {session.status}."
+            detail=f"Cannot submit answers. This session is already {session.status}.",
         )
 
     # Verify expiration boundaries
@@ -323,43 +330,57 @@ def submit_answer(
         now = datetime.now(timezone.utc)
         elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
         if elapsed > (session.time_limit_seconds + 5):
-            logger.info(f"Exam session {id} time limit exceeded during submit-answer. Auto-concluding session.")
+            logger.info(
+                f"Exam session {id} time limit exceeded during submit-answer. Auto-concluding session."
+            )
             _complete_session_internal(session, db)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Time limit exceeded. This exam session has been locked."
+                detail="Time limit exceeded. This exam session has been locked.",
             )
 
     # Verify question is associated with the active session
-    item = db.query(QuestionSetItem).filter(
-        QuestionSetItem.question_set_id == session.question_set_id,
-        QuestionSetItem.question_id == payload.question_id
-    ).first()
+    item = (
+        db.query(QuestionSetItem)
+        .filter(
+            QuestionSetItem.question_set_id == session.question_set_id,
+            QuestionSetItem.question_id == payload.question_id,
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Question is not part of this exam session."
+            detail="Question is not part of this exam session.",
         )
 
     # Validate option mapping
     is_correct = False
     if payload.selected_option_id:
-        option = db.query(QuestionOption).filter(
-            QuestionOption.id == payload.selected_option_id,
-            QuestionOption.question_id == payload.question_id
-        ).first()
+        option = (
+            db.query(QuestionOption)
+            .filter(
+                QuestionOption.id == payload.selected_option_id,
+                QuestionOption.question_id == payload.question_id,
+            )
+            .first()
+        )
         if not option:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Selected option is not valid for this question."
+                detail="Selected option is not valid for this question.",
             )
         is_correct = option.is_correct
 
     # Log/Upsert responses
-    response = db.query(ExamResponse).filter(
-        ExamResponse.exam_session_id == session.id,
-        ExamResponse.question_id == payload.question_id
-    ).first()
+    response = (
+        db.query(ExamResponse)
+        .filter(
+            ExamResponse.exam_session_id == session.id,
+            ExamResponse.question_id == payload.question_id,
+        )
+        .first()
+    )
 
     if response:
         response.selected_option_id = payload.selected_option_id
@@ -373,7 +394,7 @@ def submit_answer(
             selected_option_id=payload.selected_option_id,
             is_correct=is_correct,
             time_taken_seconds=payload.time_taken_seconds,
-            answered_at=datetime.now(timezone.utc)
+            answered_at=datetime.now(timezone.utc),
         )
         db.add(response)
 
@@ -381,18 +402,20 @@ def submit_answer(
     db.refresh(response)
 
     # Only output correctness flags immediately if in practice mode
-    reveal = (session.mode == "practice")
+    reveal = session.mode == "practice"
     correct_opt_id = None
     if reveal:
         correct_opt_id = next((o.id for o in item.question.options if o.is_correct), None)
 
-    logger.info(f"Answer submitted successfully for question {payload.question_id} in session {id}. Selected Option: {payload.selected_option_id}, Correct: {is_correct}")
+    logger.info(
+        f"Answer submitted successfully for question {payload.question_id} in session {id}. Selected Option: {payload.selected_option_id}, Correct: {is_correct}"
+    )
 
     return ExamResponseStatus(
         question_id=response.question_id,
         selected_option_id=response.selected_option_id,
         is_correct=response.is_correct if reveal else None,
-        correct_option_id=correct_opt_id
+        correct_option_id=correct_opt_id,
     )
 
 
@@ -406,17 +429,19 @@ def complete_exam_session(
     current_user: User = Depends(get_current_user),
 ):
     """Closes an active exam session explicitly, computes scores and returns results."""
-    logger.info(f"User {current_user.email} (ID: {current_user.id}) explicitly requested completion of exam session {id}")
-    session = db.query(ExamSession).filter(
-        ExamSession.id == id,
-        ExamSession.user_id == current_user.id
-    ).first()
+    logger.info(
+        f"User {current_user.email} (ID: {current_user.id}) explicitly requested completion of exam session {id}"
+    )
+    session = (
+        db.query(ExamSession)
+        .filter(ExamSession.id == id, ExamSession.user_id == current_user.id)
+        .first()
+    )
     if not session:
-        logger.warning(f"Complete exam session failed: Session {id} not found for User {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam session not found."
+        logger.warning(
+            f"Complete exam session failed: Session {id} not found for User {current_user.id}"
         )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam session not found.")
 
     if session.status == "in_progress":
         _complete_session_internal(session, db)
@@ -438,42 +463,48 @@ def get_exam_session_results(
     Computes and returns the detailed performance analysis for a concluded session.
     Calculates overall stats and tag-specific metrics.
     """
-    logger.info(f"User {current_user.email} (ID: {current_user.id}) fetching results for session {id}")
-    session = db.query(ExamSession).filter(
-        ExamSession.id == id,
-        ExamSession.user_id == current_user.id
-    ).first()
-    
+    logger.info(
+        f"User {current_user.email} (ID: {current_user.id}) fetching results for session {id}"
+    )
+    session = (
+        db.query(ExamSession)
+        .filter(ExamSession.id == id, ExamSession.user_id == current_user.id)
+        .first()
+    )
+
     if not session:
         logger.warning(f"Fetch results failed: Session {id} not found for User {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam session not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam session not found.")
 
     # Auto-conclude if timed limits have expired
     if session.status == "in_progress" and session.mode == "timed":
         now = datetime.now(timezone.utc)
         elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
         if elapsed > (session.time_limit_seconds + 5):
-            logger.info(f"Exam session {id} time limit exceeded. Auto-concluding session on results fetch.")
+            logger.info(
+                f"Exam session {id} time limit exceeded. Auto-concluding session on results fetch."
+            )
             _complete_session_internal(session, db)
             db.refresh(session)
         else:
-            logger.warning(f"Fetch results failed: Attempted to get results for active timed session {id} before completion.")
+            logger.warning(
+                f"Fetch results failed: Attempted to get results for active timed session {id} before completion."
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot retrieve results for an active timed session. Complete the session first."
+                detail="Cannot retrieve results for an active timed session. Complete the session first.",
             )
 
     # Let's count correctness stats
     correct_count = sum(1 for r in session.responses if r.is_correct)
-    
+
     # Identify which question IDs have been answered
     # Note that an answer might be logged but selected_option_id could be null (skipped)
     submitted_qids = {r.question_id for r in session.responses if r.selected_option_id is not None}
-    incorrect_count = sum(1 for r in session.responses if not r.is_correct and r.selected_option_id is not None)
-    
+    incorrect_count = sum(
+        1 for r in session.responses if not r.is_correct and r.selected_option_id is not None
+    )
+
     # A question is skipped if it has no response logged, or if selected_option_id is None
     # Let's get the list of all questions in the set to account for untyped/unanswered ones
     items = (
@@ -481,7 +512,7 @@ def get_exam_session_results(
         .filter(QuestionSetItem.question_set_id == session.question_set_id)
         .all()
     )
-    
+
     total_q_count = len(items)
     # Double check if total_q_count matches session.question_count
     if total_q_count == 0:
@@ -505,15 +536,15 @@ def get_exam_session_results(
 
     # Compile tag performance
     response_by_qid = {r.question_id: r for r in session.responses}
-    
+
     tag_stats = {}  # tag_name -> {total, correct, incorrect, skipped}
     for item in items:
         q = item.question
         resp = response_by_qid.get(q.id)
-        
+
         is_q_correct = resp.is_correct if resp else False
         is_q_submitted = (resp.selected_option_id is not None) if resp else False
-        
+
         for tag in q.tags:
             tag_name_lower = tag.name.strip().lower()
             if tag_name_lower not in tag_stats:
@@ -522,9 +553,9 @@ def get_exam_session_results(
                     "total": 0,
                     "correct": 0,
                     "incorrect": 0,
-                    "skipped": 0
+                    "skipped": 0,
                 }
-            
+
             tag_stats[tag_name_lower]["total"] += 1
             if is_q_submitted:
                 if is_q_correct:
@@ -545,7 +576,7 @@ def get_exam_session_results(
                 correct_count=stats["correct"],
                 incorrect_count=stats["incorrect"],
                 skipped_count=stats["skipped"],
-                percentage=pct
+                percentage=pct,
             )
         )
 
@@ -563,6 +594,5 @@ def get_exam_session_results(
         skipped_count=skipped_count,
         total_time_taken_seconds=total_time_taken,
         average_time_taken_seconds=round(avg_time_taken, 2),
-        tag_performance=tag_performance_list
+        tag_performance=tag_performance_list,
     )
-

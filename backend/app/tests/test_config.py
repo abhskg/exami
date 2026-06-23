@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
+
 from app.core.config import Settings
+
 
 def test_settings_load_custom_values():
     """Verify settings can be loaded/overridden with custom parameters."""
@@ -11,7 +13,7 @@ def test_settings_load_custom_values():
         APP_NAME="Custom Exam App",
         APP_ENV="production",
         DEBUG=False,
-        UPLOADS_DIR="/tmp/uploads"
+        UPLOADS_DIR="/tmp/uploads",
     )
     assert custom_settings.APP_NAME == "Custom Exam App"
     assert custom_settings.APP_ENV == "production"
@@ -20,6 +22,7 @@ def test_settings_load_custom_values():
     assert custom_settings.SECRET_KEY == "another-secret"
     assert custom_settings.GEMINI_API_KEY == "another-gemini-key"
     assert custom_settings.UPLOADS_DIR == "/tmp/uploads"
+
 
 def test_settings_missing_fields(monkeypatch):
     """Verify that settings validation fails and raises ValidationError when required fields are missing."""
@@ -33,6 +36,6 @@ def test_settings_missing_fields(monkeypatch):
 
     errors = exc_info.value.errors()
     missing_fields = {error["loc"][0] for error in errors}
-    
+
     assert "DATABASE_URL" in missing_fields
     assert "SECRET_KEY" in missing_fields

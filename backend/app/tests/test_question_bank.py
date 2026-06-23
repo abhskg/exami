@@ -8,28 +8,32 @@ Covers:
 - API: GET /api/questions/ returns questions filtered by topic.
 - API: GET /api/questions/tags returns tag list.
 """
-import pytest
+
 import uuid
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.database import Base, engine, get_db
+from app.core.security import create_access_token, get_password_hash
+
 # ── App imports ──────────────────────────────────────────────────────────────
 from app.main import app
-from app.core.database import get_db, Base, engine
-from app.models.user import User
-from app.models.topic import Topic
-from app.models.document import Document
 from app.models.content_chunk import ContentChunk
+from app.models.document import Document
 from app.models.question import Question, QuestionOption
 from app.models.tag import Tag
-from app.core.security import get_password_hash, create_access_token
-from app.core.config import settings
-from app.services.question_bank import get_similar_chunks, generate_questions, list_topic_tags
+from app.models.topic import Topic
+from app.models.user import User
+from app.services.question_bank import generate_questions, get_similar_chunks, list_topic_tags
 
 # ── Force test environment so mock paths are triggered ──────────────────────
 settings.APP_ENV = "test"
 
 # ── Database fixture ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def db():
@@ -48,6 +52,7 @@ def db():
 def client(db):
     def override_get_db():
         yield db
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
@@ -55,6 +60,7 @@ def client(db):
 
 
 # ── Seed helpers ─────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_user(db):
@@ -132,6 +138,7 @@ def auth_headers(auth_token):
 
 # ── Task 5.1: Vector Similarity Tests ────────────────────────────────────────
 
+
 class TestGetSimilarChunks:
 
     def test_returns_chunks_for_topic(self, db, test_user, test_topic, test_chunks):
@@ -191,6 +198,7 @@ class TestGetSimilarChunks:
 
 # ── Task 5.2: MCQ Generation Tests ───────────────────────────────────────────
 
+
 class TestGenerateQuestions:
 
     def test_generates_and_saves_questions(self, db, test_user, test_topic, test_chunks):
@@ -241,10 +249,14 @@ class TestGenerateQuestions:
 
     def test_duplicate_tags_not_created(self, db, test_user, test_topic, test_chunks):
         """Running generation twice should not duplicate tags."""
-        before = db.query(Tag).filter(
-            Tag.user_id == test_user.id,
-            Tag.topic_id == test_topic.id,
-        ).count()
+        before = (
+            db.query(Tag)
+            .filter(
+                Tag.user_id == test_user.id,
+                Tag.topic_id == test_topic.id,
+            )
+            .count()
+        )
 
         generate_questions(
             topic_id=test_topic.id,
@@ -255,10 +267,14 @@ class TestGenerateQuestions:
             db=db,
         )
 
-        after = db.query(Tag).filter(
-            Tag.user_id == test_user.id,
-            Tag.topic_id == test_topic.id,
-        ).count()
+        after = (
+            db.query(Tag)
+            .filter(
+                Tag.user_id == test_user.id,
+                Tag.topic_id == test_topic.id,
+            )
+            .count()
+        )
 
         # Should reuse existing tags — at most 2 new ones (mock + test), likely 0
         assert after - before <= 2
@@ -280,6 +296,7 @@ class TestGenerateQuestions:
 
 
 # ── API Endpoint Tests ────────────────────────────────────────────────────────
+
 
 class TestQuestionsAPI:
 
