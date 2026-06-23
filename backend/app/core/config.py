@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI-Powered Exam Preparation Portal"
     APP_ENV: str = "local"
     DEBUG: bool = True
+    LOG_LEVEL: str = "DEBUG"
 
     # Database Configuration (PostgreSQL + pgvector)
     DATABASE_URL: str

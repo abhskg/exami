@@ -7,12 +7,15 @@ POST /api/exams/sessions/{id}/submit-answer — Record answer submission and val
 POST /api/exams/sessions/{id}/complete       — Conclude exam session and compile results
 """
 import json
+import logging
 from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.api.auth_dependencies import get_current_user
 from app.core.database import get_db
@@ -56,6 +59,7 @@ def _complete_session_internal(session: ExamSession, db: Session) -> None:
 
     db.add(session)
     db.commit()
+    logger.info(f"Exam session {session.id} concluded. Mode: {session.mode}, Score: {session.score}%, Correct: {correct_count}/{session.question_count}")
 
 
 def _build_session_response(session: ExamSession, db: Session) -> ExamSessionResponse:
@@ -158,11 +162,14 @@ def create_exam_session(
     Starts a newTimed or Practice exam session. Matches questions from question
     bank based on filters, saves locked order to a QuestionSet, and creates session.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) attempting to start exam session for topic {payload.topic_id}. Mode: {payload.mode}, Count: {payload.question_count}")
+    
     topic = db.query(Topic).filter(
         Topic.id == payload.topic_id,
         Topic.user_id == current_user.id
     ).first()
     if not topic:
+        logger.warning(f"Start exam session failed: Topic {payload.topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found or access denied."
@@ -187,6 +194,7 @@ def create_exam_session(
     questions = query.order_by(func.random()).limit(payload.question_count).all()
 
     if not questions:
+        logger.warning(f"Start exam session failed: No questions found matching filters for topic {payload.topic_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No questions found matching the selected filters. Please generate questions first."
@@ -237,6 +245,7 @@ def create_exam_session(
     db.commit()
     db.refresh(session)
 
+    logger.info(f"Exam session {session.id} successfully created with {session.question_count} questions for User {current_user.id}")
     return _build_session_response(session, db)
 
 
@@ -250,11 +259,13 @@ def get_exam_session(
     current_user: User = Depends(get_current_user),
 ):
     """Fetches details for an existing exam session, checking timed limits."""
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) fetching exam session {id}")
     session = db.query(ExamSession).filter(
         ExamSession.id == id,
         ExamSession.user_id == current_user.id
     ).first()
     if not session:
+        logger.warning(f"Fetch exam session failed: Session {id} not found for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exam session not found."
@@ -265,6 +276,7 @@ def get_exam_session(
         now = datetime.now(timezone.utc)
         elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
         if elapsed > (session.time_limit_seconds + 5):
+            logger.info(f"Exam session {id} time limit exceeded. Auto-concluding session on fetch.")
             _complete_session_internal(session, db)
             db.refresh(session)
 
@@ -285,11 +297,14 @@ def submit_answer(
     Logs an answer submission to the exam response history. Enforces session state,
     verifies if question is part of the session, and enforces server timed lock boundaries.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) submitting answer to question {payload.question_id} in session {id}")
+    
     session = db.query(ExamSession).filter(
         ExamSession.id == id,
         ExamSession.user_id == current_user.id
     ).first()
     if not session:
+        logger.warning(f"Submit answer failed: Session {id} not found for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exam session not found."
@@ -297,6 +312,7 @@ def submit_answer(
 
     # Block submissions on concluded tests
     if session.status != "in_progress":
+        logger.warning(f"Submit answer failed: Session {id} is already completed/locked.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot submit answers. This session is already {session.status}."
@@ -307,6 +323,7 @@ def submit_answer(
         now = datetime.now(timezone.utc)
         elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
         if elapsed > (session.time_limit_seconds + 5):
+            logger.info(f"Exam session {id} time limit exceeded during submit-answer. Auto-concluding session.")
             _complete_session_internal(session, db)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -369,6 +386,8 @@ def submit_answer(
     if reveal:
         correct_opt_id = next((o.id for o in item.question.options if o.is_correct), None)
 
+    logger.info(f"Answer submitted successfully for question {payload.question_id} in session {id}. Selected Option: {payload.selected_option_id}, Correct: {is_correct}")
+
     return ExamResponseStatus(
         question_id=response.question_id,
         selected_option_id=response.selected_option_id,
@@ -387,11 +406,13 @@ def complete_exam_session(
     current_user: User = Depends(get_current_user),
 ):
     """Closes an active exam session explicitly, computes scores and returns results."""
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) explicitly requested completion of exam session {id}")
     session = db.query(ExamSession).filter(
         ExamSession.id == id,
         ExamSession.user_id == current_user.id
     ).first()
     if not session:
+        logger.warning(f"Complete exam session failed: Session {id} not found for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exam session not found."
@@ -417,12 +438,14 @@ def get_exam_session_results(
     Computes and returns the detailed performance analysis for a concluded session.
     Calculates overall stats and tag-specific metrics.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) fetching results for session {id}")
     session = db.query(ExamSession).filter(
         ExamSession.id == id,
         ExamSession.user_id == current_user.id
     ).first()
     
     if not session:
+        logger.warning(f"Fetch results failed: Session {id} not found for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exam session not found."
@@ -433,9 +456,11 @@ def get_exam_session_results(
         now = datetime.now(timezone.utc)
         elapsed = (now - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
         if elapsed > (session.time_limit_seconds + 5):
+            logger.info(f"Exam session {id} time limit exceeded. Auto-concluding session on results fetch.")
             _complete_session_internal(session, db)
             db.refresh(session)
         else:
+            logger.warning(f"Fetch results failed: Attempted to get results for active timed session {id} before completion.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot retrieve results for an active timed session. Complete the session first."

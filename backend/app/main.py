@@ -1,22 +1,37 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import logging
+import time
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy import text
+
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.api.api import api_router
+from app.core.logging_config import setup_logging
+
+# Initialize logging configuration
+setup_logging()
+
+logger = logging.getLogger("app.main")
 
 # Import all models to ensure they are registered on the Base metadata
 import app.models
-from sqlalchemy import text
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting up FastAPI application...")
     # Initialize database tables for the Local-First MVP
     # Ensure pgvector extension is enabled first
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=engine)
+    logger.info("Database tables initialized successfully.")
     yield
+    logger.info("Shutting down FastAPI application...")
 
 app = FastAPI(
     title=f"{settings.APP_NAME} API",
@@ -25,6 +40,68 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.perf_counter()
+    path = request.url.path
+    query_params = request.url.query
+    full_path = f"{path}?{query_params}" if query_params else path
+    client_host = request.client.host if request.client else "unknown"
+    
+    logger.info(f"Incoming request: {request.method} {full_path} from {client_host}")
+    
+    try:
+        response = await call_next(request)
+        duration = time.perf_counter() - start_time
+        logger.info(
+            f"Completed request: {request.method} {full_path} - "
+            f"Status {response.status_code} - "
+            f"Duration: {duration:.3f}s"
+        )
+        return response
+    except Exception as e:
+        duration = time.perf_counter() - start_time
+        logger.exception(
+            f"Unhandled exception occurred while processing {request.method} {full_path}: {str(e)}"
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "An unexpected error occurred. Please try again later."}
+        )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.warning(
+        f"HTTP exception on {request.method} {request.url.path}: "
+        f"status_code={exc.status_code} detail={exc.detail}"
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(
+        f"Request validation failed on {request.method} {request.url.path}: "
+        f"errors={exc.errors()}"
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        f"Unhandled exception occurred while processing {request.method} {request.url.path}: {str(exc)}"
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again later."}
+    )
+
 
 # CORS configuration for React frontend communication
 app.add_middleware(

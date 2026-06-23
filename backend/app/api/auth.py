@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -13,9 +16,12 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     Register a new user.
     Hashes password and saves user details to database.
     """
+    logger.info(f"Attempting to register new user with email: {user_in.email}")
+    
     # Check if a user with this email already exists
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
+        logger.warning(f"Registration failed: User with email {user_in.email} already exists.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user with this email already exists."
@@ -33,6 +39,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    
+    logger.info(f"User registered successfully: {db_user.email} (ID: {db_user.id})")
     return db_user
 
 @router.post("/login", response_model=Token)
@@ -40,9 +48,12 @@ def login(login_in: UserLogin, db: Session = Depends(get_db)):
     """
     Authenticate user and return a JWT access token.
     """
+    logger.info(f"Attempting login for user: {login_in.email}")
+    
     # Verify user existence and credentials
     user = db.query(User).filter(User.email == login_in.email).first()
     if not user or not verify_password(login_in.password, user.password_hash):
+        logger.warning(f"Login failed: Invalid credentials for user {login_in.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
@@ -50,8 +61,11 @@ def login(login_in: UserLogin, db: Session = Depends(get_db)):
     
     # Generate and return access token
     access_token = create_access_token(subject=user.id)
+    logger.info(f"User authenticated successfully: {user.email} (ID: {user.id})")
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user": user
     }
+

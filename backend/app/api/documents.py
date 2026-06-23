@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ from app.schemas.document import DocumentResponse
 from app.core.config import settings
 from app.workers.ingestion import process_document_task
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 @router.get("/", response_model=list[DocumentResponse])
@@ -25,18 +28,23 @@ def list_documents(
     """
     List all documents for the current user in a specific topic.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) listing documents for topic {topic_id}")
+    
     # Enforce isolation
     topic = db.query(Topic).filter(Topic.id == topic_id, Topic.user_id == current_user.id).first()
     if not topic:
+        logger.warning(f"List documents failed: Topic {topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found."
         )
         
-    return db.query(Document).filter(
+    docs = db.query(Document).filter(
         Document.user_id == current_user.id,
         Document.topic_id == topic_id
     ).order_by(Document.ingested_at.desc()).all()
+    logger.debug(f"Retrieved {len(docs)} documents for topic {topic_id}")
+    return docs
 
 @router.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
@@ -50,9 +58,12 @@ async def upload_document(
     Upload a document (PDF, TXT, MD), save it to the local filesystem,
     create metadata entries, and trigger background parsing/ingestion.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) uploading document '{file.filename}' for topic {topic_id}")
+    
     # 1. Enforce isolation and topic scope
     topic = db.query(Topic).filter(Topic.id == topic_id, Topic.user_id == current_user.id).first()
     if not topic:
+        logger.warning(f"Upload rejected: Topic {topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found or access denied."
@@ -63,6 +74,7 @@ async def upload_document(
     _, ext = os.path.splitext(filename)
     ext = ext.lower()
     if ext not in [".pdf", ".txt", ".md"]:
+        logger.warning(f"Upload rejected: Unsupported extension '{ext}' for file '{filename}'")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported file type. Only PDF, TXT, and MD files are allowed."
@@ -71,6 +83,7 @@ async def upload_document(
     # 3. Validate file size (15MB limit)
     contents = await file.read()
     if len(contents) > 15 * 1024 * 1024:
+        logger.warning(f"Upload rejected: File size {len(contents)} bytes exceeds the 15MB limit for '{filename}'")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File size exceeds the maximum limit of 15MB."
@@ -114,6 +127,8 @@ async def upload_document(
     db.refresh(doc_record)
     db.refresh(job_record)
     
+    logger.info(f"File uploaded. Document ID: {document_id}. Registered background ingestion Job ID: {job_record.id}")
+    
     # 7. Register background worker task
     background_tasks.add_task(
         process_document_task,
@@ -152,9 +167,12 @@ async def ingest_raw_text(
     Ingest a document from raw text content, save it to the local filesystem as a .txt file,
     create metadata entries, and trigger background parsing/ingestion.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) ingesting raw text: '{req.title}' for topic {req.topic_id}")
+    
     # 1. Enforce isolation and topic scope
     topic = db.query(Topic).filter(Topic.id == req.topic_id, Topic.user_id == current_user.id).first()
     if not topic:
+        logger.warning(f"Raw text ingestion rejected: Topic {req.topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found or access denied."
@@ -163,6 +181,7 @@ async def ingest_raw_text(
     # 2. Validate content size limit (15MB limit)
     content_bytes = req.content.encode("utf-8")
     if len(content_bytes) > 15 * 1024 * 1024:
+        logger.warning(f"Raw text ingestion rejected: Size {len(content_bytes)} bytes exceeds the 15MB limit for topic {req.topic_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Content size exceeds the maximum limit of 15MB."
@@ -203,6 +222,8 @@ async def ingest_raw_text(
     db.refresh(doc_record)
     db.refresh(job_record)
 
+    logger.info(f"Raw text document created. Document ID: {document_id}. Registered background ingestion Job ID: {job_record.id}")
+
     # 6. Register background worker task
     background_tasks.add_task(
         process_document_task,
@@ -229,9 +250,12 @@ async def ingest_web_search(
     Ingest a document by simulating web search agent scraping, save it to the local filesystem as a .txt file,
     create metadata entries, and trigger background parsing/ingestion.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) triggering simulated web search parser: '{req.title}' for topic {req.topic_id}")
+    
     # 1. Enforce isolation and topic scope
     topic = db.query(Topic).filter(Topic.id == req.topic_id, Topic.user_id == current_user.id).first()
     if not topic:
+        logger.warning(f"Web search ingestion rejected: Topic {req.topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found or access denied."
@@ -258,6 +282,7 @@ Simulated Parser Agent Run:
 
     content_bytes = web_parsed_content.encode("utf-8")
     if len(content_bytes) > 15 * 1024 * 1024:
+        logger.warning(f"Web search ingestion rejected: Corpus size {len(content_bytes)} bytes exceeds 15MB for topic {req.topic_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Content size exceeds the maximum limit of 15MB."
@@ -297,6 +322,8 @@ Simulated Parser Agent Run:
     db.commit()
     db.refresh(doc_record)
     db.refresh(job_record)
+
+    logger.info(f"Web scan simulated document created. Document ID: {document_id}. Registered background ingestion Job ID: {job_record.id}")
 
     # 6. Register background worker task
     background_tasks.add_task(

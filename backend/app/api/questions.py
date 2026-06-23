@@ -5,6 +5,7 @@ POST /api/questions/generate   — Generate MCQs from topic context via Gemini
 GET  /api/questions/           — List saved questions for a topic
 GET  /api/questions/tags       — List all tags for a topic (for UI chips)
 """
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -22,6 +23,8 @@ from app.schemas.question import (
     TagResponse,
 )
 from app.services import question_bank
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -41,12 +44,15 @@ def generate_questions(
     Context chunks are retrieved via pgvector similarity search, then Gemini
     is prompted to produce structured JSON MCQs which are persisted to the DB.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) requesting question generation. Topic: {payload.topic_id}, Count: {payload.count}, Difficulty: {payload.difficulty}, Tags: {payload.tag_filters}")
+    
     # Enforce topic ownership
     topic = db.query(Topic).filter(
         Topic.id == payload.topic_id,
         Topic.user_id == current_user.id,
     ).first()
     if not topic:
+        logger.warning(f"Generate questions failed: Topic {payload.topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found or access denied.",
@@ -62,12 +68,14 @@ def generate_questions(
             db=db,
         )
     except Exception as e:
+        logger.error(f"Question generation failed for User {current_user.id}, Topic {payload.topic_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Question generation failed: {str(e)}",
         )
 
     questions_out = [QuestionResponse.from_orm_with_tags(q) for q in saved]
+    logger.info(f"Successfully generated and saved {len(questions_out)} questions for Topic {payload.topic_id} and User {current_user.id}")
     return GenerateQuestionsResponse(generated=len(questions_out), questions=questions_out)
 
 
@@ -88,12 +96,15 @@ def list_questions(
     List all questions for the authenticated user within a specific topic.
     Supports optional filtering by difficulty and tag name.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) listing questions for topic {topic_id}. Filters: difficulty={difficulty}, tag={tag}, limit={limit}")
+    
     # Enforce topic ownership
     topic = db.query(Topic).filter(
         Topic.id == topic_id,
         Topic.user_id == current_user.id,
     ).first()
     if not topic:
+        logger.warning(f"List questions failed: Topic {topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found.",
@@ -128,9 +139,11 @@ def list_questions(
                 qt.c.tag_id == tag_obj.id
             )
         else:
+            logger.debug(f"Tag '{tag}' not found for topic {topic_id}. Returning empty list.")
             return []
 
     questions = query.order_by(Question.created_at.desc()).limit(limit).all()
+    logger.debug(f"Retrieved {len(questions)} questions for topic {topic_id}")
     return [QuestionResponse.from_orm_with_tags(q) for q in questions]
 
 
@@ -148,11 +161,13 @@ def list_tags(
     Return all tags associated with the user's topic, ordered alphabetically.
     Used by the frontend to populate tag-filter chip selectors.
     """
+    logger.info(f"User {current_user.email} (ID: {current_user.id}) listing tags for topic {topic_id}")
     topic = db.query(Topic).filter(
         Topic.id == topic_id,
         Topic.user_id == current_user.id,
     ).first()
     if not topic:
+        logger.warning(f"List tags failed: Topic {topic_id} not found or access denied for User {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Topic not found.",
@@ -163,4 +178,5 @@ def list_tags(
         user_id=current_user.id,
         db=db,
     )
+    logger.debug(f"Retrieved {len(tags)} tags for topic {topic_id}")
     return tags
