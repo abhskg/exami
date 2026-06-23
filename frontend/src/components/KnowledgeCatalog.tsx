@@ -1125,6 +1125,8 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                     'linear-gradient(135deg, rgba(99,102,241,0.03) 0%, rgba(255,255,255,0.01) 100%)',
                   border: '1px solid var(--border-color)',
                   borderRadius: '16px',
+                  opacity: isLoadingAnalytics ? 0.6 : 1,
+                  transition: 'opacity var(--transition-fast)',
                 }}
               >
                 <div

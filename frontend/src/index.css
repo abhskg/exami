@@ -1,6 +1,8 @@
 /* Design System & Base Styling - AI-Powered Exam Preparation Portal */
 
 :root {
+  color-scheme: dark;
+
   /* Color Palette - HSL Tailored premium colors (Slate/Indigo/Violet theme) */
   --bg-primary: #0b0f19;
   --bg-secondary: #131b2e;
@@ -184,6 +186,11 @@ textarea {
   font-family: var(--font-sans);
   font-size: 1rem;
   transition: var(--transition-fast);
+}
+
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 input:focus,

@@ -3392,7 +3392,7 @@ function App() {
                           >
                             {explanation ? (
                               sentences.length > 1 ? (
-                                sentences.map((sentence, idx) => (
+                                sentences.map((sentence: string, idx: number) => (
                                   <p
                                     key={`${idx}-${sentence.slice(0, 30)}`}
                                     style={{
