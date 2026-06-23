@@ -153,7 +153,60 @@ docker compose up -d
     npm run dev
     ```
 
+
 ---
+
+## 🤖 Swapping LLM Providers & Models
+
+You can configure which LLM provider to use for generating questions and text embeddings by editing the `backend/.env` file. The application supports **Gemini**, **OpenAI**, and **LMStudio (Local Keyless)**.
+
+### Configuration Settings
+
+The following variables in `backend/.env` control the active providers:
+
+| Variable | Description | Allowed Values / Examples |
+| :--- | :--- | :--- |
+| `LLM_PROVIDER` | Provider for MCQ generation | `gemini` (default), `openai`, `lmstudio` |
+| `LLM_MODEL` | Specific model for MCQ generation | `gemini-2.0-flash`, `gpt-4o-mini`, custom local model |
+| `EMBEDDING_PROVIDER` | Provider for text embeddings | `gemini` (default), `openai`, `lmstudio`, `mock` |
+| `EMBEDDING_MODEL` | Model used for vector embeddings | `text-embedding-004`, `text-embedding-3-small`, local model |
+
+### Example Configurations
+
+#### 1. Google Gemini (Default)
+```env
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.0-flash
+GEMINI_API_KEY="your-gemini-api-key"
+
+EMBEDDING_PROVIDER=gemini
+EMBEDDING_MODEL=text-embedding-004
+```
+
+#### 2. OpenAI
+When using OpenAI, the vector output of `text-embedding-3-*` models is automatically configured or normalized (padded/truncated) to **768 dimensions** to align with the database schema.
+```env
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o-mini
+OPENAI_API_KEY="sk-proj-..."
+
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+#### 3. LMStudio (Local Offline Mode)
+Make sure LMStudio's local server is running. No API keys are required for local providers.
+```env
+LLM_PROVIDER=lmstudio
+LLM_MODEL="your-loaded-model-name"
+LMSTUDIO_BASE_URL="http://localhost:1234/v1"
+
+EMBEDDING_PROVIDER=lmstudio
+EMBEDDING_MODEL="nomic-embed-text-v1.5"
+```
+
+---
+
 
 ## 🧪 Testing
 
