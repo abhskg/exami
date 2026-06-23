@@ -8,6 +8,8 @@ from app.models.document import Document
 from app.models.job import Job
 from app.models.topic import Topic
 from app.workers.ingestion import process_document_task
+from app.core.config import settings
+
 
 
 def get_auth_headers(client):
@@ -69,8 +71,8 @@ def test_upload_validations(client, db):
     assert res.status_code == status.HTTP_400_BAD_REQUEST
     assert "Only PDF, TXT, and MD files are allowed" in res.json()["detail"]
 
-    # 2. Reject size exceeding 15MB
-    large_content = b"x" * (15 * 1024 * 1024 + 100)
+    # 2. Reject size exceeding MAX_FILE_SIZE_MB
+    large_content = b"x" * (settings.MAX_FILE_SIZE_MB * 1024 * 1024 + 100)
     files = {"file": ("large.txt", large_content, "text/plain")}
     res = client.post(
         "/api/documents/upload",
@@ -79,7 +81,7 @@ def test_upload_validations(client, db):
         headers=headers,
     )
     assert res.status_code == status.HTTP_400_BAD_REQUEST
-    assert "exceeds the maximum limit of 15MB" in res.json()["detail"]
+    assert f"exceeds the maximum limit of {settings.MAX_FILE_SIZE_MB}MB" in res.json()["detail"]
 
 
 def test_successful_upload_and_polling(client, db):

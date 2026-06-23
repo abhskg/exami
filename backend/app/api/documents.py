@@ -107,15 +107,15 @@ async def upload_document(
             detail="Unsupported file type. Only PDF, TXT, and MD files are allowed.",
         )
 
-    # 3. Validate file size (15MB limit)
+    # 3. Validate file size (settings.MAX_FILE_SIZE_MB limit)
     contents = await file.read()
-    if len(contents) > 15 * 1024 * 1024:
+    if len(contents) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
         logger.warning(
-            f"Upload rejected: File size {len(contents)} bytes exceeds the 15MB limit for '{filename}'"
+            f"Upload rejected: File size {len(contents)} bytes exceeds the {settings.MAX_FILE_SIZE_MB}MB limit for '{filename}'"
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File size exceeds the maximum limit of 15MB.",
+            detail=f"File size exceeds the maximum limit of {settings.MAX_FILE_SIZE_MB}MB.",
         )
 
     # 4. Generate metadata & path
@@ -211,15 +211,15 @@ async def ingest_raw_text(
             detail="Topic not found or access denied.",
         )
 
-    # 2. Validate content size limit (15MB limit)
+    # 2. Validate content size limit (settings.MAX_FILE_SIZE_MB limit)
     content_bytes = req.content.encode("utf-8")
-    if len(content_bytes) > 15 * 1024 * 1024:
+    if len(content_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
         logger.warning(
-            f"Raw text ingestion rejected: Size {len(content_bytes)} bytes exceeds the 15MB limit for topic {req.topic_id}"
+            f"Raw text ingestion rejected: Size {len(content_bytes)} bytes exceeds the {settings.MAX_FILE_SIZE_MB}MB limit for topic {req.topic_id}"
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Content size exceeds the maximum limit of 15MB.",
+            detail=f"Content size exceeds the maximum limit of {settings.MAX_FILE_SIZE_MB}MB.",
         )
 
     # 3. Generate metadata & path
@@ -319,13 +319,13 @@ Simulated Parser Agent Run:
 """
 
     content_bytes = web_parsed_content.encode("utf-8")
-    if len(content_bytes) > 15 * 1024 * 1024:
+    if len(content_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
         logger.warning(
-            f"Web search ingestion rejected: Corpus size {len(content_bytes)} bytes exceeds 15MB for topic {req.topic_id}"
+            f"Web search ingestion rejected: Corpus size {len(content_bytes)} bytes exceeds {settings.MAX_FILE_SIZE_MB}MB for topic {req.topic_id}"
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Content size exceeds the maximum limit of 15MB.",
+            detail=f"Content size exceeds the maximum limit of {settings.MAX_FILE_SIZE_MB}MB.",
         )
 
     # 3. Generate metadata & path

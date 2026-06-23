@@ -156,9 +156,12 @@ docker compose up -d
 2.  Install dependencies and copy environmental configuration template:
     ```bash
     npm install
+    ```
+3.  Copy the `.env.example` to `.env` and configure `VITE_MAX_FILE_SIZE_MB` if a different upload limit is desired (default: `15`):
+    ```bash
     cp .env.example .env
     ```
-3.  Start the Vite React development server:
+4.  Start the Vite React development server:
     ```bash
     npm run dev
     ```
@@ -171,7 +174,7 @@ You can configure which LLM provider to use for generating questions and text em
 
 ### Configuration Settings
 
-The following variables in `backend/.env` control the active providers:
+The following variables in `backend/.env` control the active providers and limits:
 
 | Variable             | Description                       | Allowed Values / Examples                                   |
 | :------------------- | :-------------------------------- | :---------------------------------------------------------- |
@@ -179,6 +182,7 @@ The following variables in `backend/.env` control the active providers:
 | `LLM_MODEL`          | Specific model for MCQ generation | `gemini-2.0-flash`, `gpt-4o-mini`, custom local model       |
 | `EMBEDDING_PROVIDER` | Provider for text embeddings      | `gemini` (default), `openai`, `lmstudio`, `mock`            |
 | `EMBEDDING_MODEL`    | Model used for vector embeddings  | `text-embedding-004`, `text-embedding-3-small`, local model |
+| `MAX_FILE_SIZE_MB`   | Maximum allowed file upload size  | Integer value in MB (default: `15`)                         |
 
 ### Example Configurations
 

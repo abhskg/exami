@@ -133,4 +133,6 @@ async def health_check():
         "environment": settings.APP_ENV,
         "llm_provider": settings.LLM_PROVIDER,
         "embedding_provider": settings.EMBEDDING_PROVIDER,
+        "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
     }
+

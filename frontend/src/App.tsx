@@ -56,6 +56,10 @@ function App() {
   // Active LLM & Embedding provider info from backend
   const [llmProvider, setLlmProvider] = useState<string>('gemini');
   const [embeddingProvider, setEmbeddingProvider] = useState<string>('gemini');
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState<number>(() => {
+    const envVal = import.meta.env.VITE_MAX_FILE_SIZE_MB;
+    return envVal ? parseInt(envVal, 10) : 15;
+  });
 
   // Topics & Documents state
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -145,6 +149,9 @@ function App() {
         }
         if (data.embedding_provider) {
           setEmbeddingProvider(data.embedding_provider);
+        }
+        if (data.max_file_size_mb) {
+          setMaxFileSizeMb(data.max_file_size_mb);
         }
       } else {
         setDbConnected(false);
@@ -300,8 +307,8 @@ function App() {
       showToast('Unsupported file type. Please upload a PDF, TXT or MD document.', 'error');
       return;
     }
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('File size exceeds 15MB limit.', 'error');
+    if (file.size > maxFileSizeMb * 1024 * 1024) {
+      showToast(`File size exceeds ${maxFileSizeMb}MB limit.`, 'error');
       return;
     }
     setSelectedFile(file);
@@ -1764,7 +1771,7 @@ function App() {
                             Drag & drop documents here, or click to select file
                           </p>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            Supports PDF, MD, TXT (Max 15MB)
+                            Supports PDF, MD, TXT (Max {maxFileSizeMb}MB)
                           </span>
                         </div>
                       )}
