@@ -171,27 +171,39 @@ def generate_questions(
     if not context_blocks.strip():
         context_blocks = "(No document context available — generate general questions)"
 
-    # --- Step 3: Build structured prompt --------------------------------------
-    tag_hint = (
-        f"Focus especially on these concepts/tags: {', '.join(tag_filters)}."
-        if tag_filters
-        else "Cover a broad range of key concepts from the context."
-    )
+    # --- Step 3 & 4: Call LLM in batches of at most 5 questions ----------------
+    import random
+    import time
 
-    difficulty_instruction = {
-        "easy": "Make questions straightforward and fact-based.",
-        "medium": "Make questions moderately challenging requiring some reasoning.",
-        "hard": "Make questions challenging, requiring deep understanding and analysis.",
-        "mixed": "Mix easy, medium, and hard difficulty levels across questions.",
-    }.get(difficulty, "Make questions moderately challenging.")
+    batch_size = 5
+    raw_mcqs = []
+    remaining = count
+    batch_num = 1
+    last_exception = None
 
-    prompt = f"""You are an expert exam question generator and educator. Generate exactly {count} high-quality multiple-choice questions (MCQs) based on the study material provided below.
+    while remaining > 0:
+        current_batch_size = min(remaining, batch_size)
+
+        tag_hint = (
+            f"Focus especially on these concepts/tags: {', '.join(tag_filters)}."
+            if tag_filters
+            else "Cover a broad range of key concepts from the context."
+        )
+
+        difficulty_instruction = {
+            "easy": "Make questions straightforward and fact-based.",
+            "medium": "Make questions moderately challenging requiring some reasoning.",
+            "hard": "Make questions challenging, requiring deep understanding and analysis.",
+            "mixed": "Mix easy, medium, and hard difficulty levels across questions.",
+        }.get(difficulty, "Make questions moderately challenging.")
+
+        prompt = f"""You are an expert exam question generator and educator. Generate exactly {current_batch_size} high-quality multiple-choice questions (MCQs) based on the study material provided below.
 
 CONTEXT (study material excerpts):
 {context_blocks}
 
 REQUIREMENTS:
-- Generate exactly {count} MCQs.
+- Generate exactly {current_batch_size} MCQs.
 - Each question must have exactly 4 answer options.
 - Exactly one option must be correct (is_correct: true).
 - {difficulty_instruction}
@@ -220,65 +232,105 @@ OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
   }}
 ]"""
 
-    # --- Step 4: Call LLM -----------------------------------------------------
-    raw_mcqs = _call_llm_generate(prompt, count, difficulty)
+        logger.info(
+            f"Generating batch {batch_num} with {current_batch_size} questions (remaining: {remaining - current_batch_size})."
+        )
+        try:
+            batch_res = _call_llm_generate(prompt, current_batch_size, difficulty)
+            if batch_res:
+                raw_mcqs.extend(batch_res)
+        except Exception as e:
+            logger.error(f"Error in batch {batch_num} question generation: {e}")
+            last_exception = e
+
+        remaining -= current_batch_size
+        batch_num += 1
+
+        if remaining > 0:
+            time.sleep(1.0)
+
+    if not raw_mcqs and last_exception:
+        # If we got absolutely no questions across all batches, raise the exception
+        logger.error("No questions generated and API failed on last batch.")
+        raise last_exception
 
     # --- Step 5: Persist to DB ------------------------------------------------
     saved_questions: list[Question] = []
 
     for raw in raw_mcqs:
-        # Validate minimum structure
-        q_text = raw.get("question_text", "").strip()
-        options_raw = raw.get("options", [])
-        if not q_text or not options_raw:
-            logger.warning("Skipping malformed MCQ from Gemini response.")
-            continue
-
-        q_difficulty = raw.get("difficulty", difficulty if difficulty != "mixed" else "medium")
-        q_explanation = raw.get("explanation", "")
-        q_tags = [t.strip().lower() for t in raw.get("tags", []) if t.strip()]
-
-        # Find source chunk (use first chunk as attribution if available)
-        source_chunk_id: Optional[UUID] = chunks[0].id if chunks else None
-
-        question = Question(
-            user_id=user_id,
-            topic_id=topic_id,
-            source_chunk_id=source_chunk_id,
-            question_text=q_text,
-            explanation=q_explanation,
-            difficulty=q_difficulty,
-            generated_by="ai",
-            is_active=True,
-        )
-        db.add(question)
-        db.flush()  # get question.id
-
-        # Options
-        for order_idx, opt in enumerate(options_raw[:4]):
-            option = QuestionOption(
-                question_id=question.id,
-                option_text=opt.get("text", "").strip(),
-                is_correct=bool(opt.get("is_correct", False)),
-                option_order=order_idx,
-            )
-            db.add(option)
-
-        # Tags (many-to-many via question_tags association table)
-        for tag_name in q_tags:
-            if not tag_name:
+        try:
+            # Validate minimum structure
+            q_text = raw.get("question_text", "").strip()
+            options_raw = raw.get("options", [])
+            if not q_text or not options_raw:
+                logger.warning(
+                    "Skipping malformed MCQ from Gemini response (missing text or options)."
+                )
                 continue
-            tag = _resolve_or_create_tag(tag_name, topic_id, user_id, db)
-            # Insert into association table only if not already linked
-            exists = db.execute(
-                text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
-                {"qid": question.id, "tid": tag.id},
-            ).first()
-            if not exists:
-                db.execute(question_tags.insert().values(question_id=question.id, tag_id=tag.id))
 
-        db.flush()
-        saved_questions.append(question)
+            q_difficulty = raw.get("difficulty", difficulty if difficulty != "mixed" else "medium")
+            q_explanation = raw.get("explanation", "")
+            q_tags = [t.strip().lower() for t in raw.get("tags", []) if t.strip()]
+
+            # Find source chunk (use first chunk as attribution if available)
+            source_chunk_id: Optional[UUID] = chunks[0].id if chunks else None
+
+            question = Question(
+                user_id=user_id,
+                topic_id=topic_id,
+                source_chunk_id=source_chunk_id,
+                question_text=q_text,
+                explanation=q_explanation,
+                difficulty=q_difficulty,
+                generated_by="ai",
+                is_active=True,
+            )
+            db.add(question)
+            db.flush()  # get question.id
+
+            # Shuffling option positions to randomize correct option
+            options_list = list(options_raw[:4])
+            random.shuffle(options_list)
+
+            # Options persistence
+            for order_idx, opt in enumerate(options_list):
+                opt_text = ""
+                opt_is_correct = False
+                if isinstance(opt, dict):
+                    opt_text = opt.get("text", "").strip()
+                    opt_is_correct = bool(opt.get("is_correct", False))
+                elif isinstance(opt, str):
+                    opt_text = opt.strip()
+                    opt_is_correct = False
+
+                option = QuestionOption(
+                    question_id=question.id,
+                    option_text=opt_text,
+                    is_correct=opt_is_correct,
+                    option_order=order_idx,
+                )
+                db.add(option)
+
+            # Tags (many-to-many via question_tags association table)
+            for tag_name in q_tags:
+                if not tag_name:
+                    continue
+                tag = _resolve_or_create_tag(tag_name, topic_id, user_id, db)
+                # Insert into association table only if not already linked
+                exists = db.execute(
+                    text("SELECT 1 FROM question_tags WHERE question_id = :qid AND tag_id = :tid"),
+                    {"qid": question.id, "tid": tag.id},
+                ).first()
+                if not exists:
+                    db.execute(
+                        question_tags.insert().values(question_id=question.id, tag_id=tag.id)
+                    )
+
+            db.flush()
+            saved_questions.append(question)
+        except Exception as q_err:
+            logger.error(f"Error parsing/saving single generated question: {q_err}")
+            continue
 
     db.commit()
 

@@ -135,9 +135,9 @@ class TestExamEngineAPI:
         assert body["status"] == "in_progress"
         assert body["mode"] == "practice"
         assert len(body["questions"]) == 3
-        # In practice mode, explanations should not be leaked initially
+        # In practice mode, explanations are available for immediate feedback
         for q in body["questions"]:
-            assert q["explanation"] is None
+            assert q["explanation"] is not None
             assert len(q["options"]) == 4
 
     def test_practice_mode_exposes_correctness_immediately(

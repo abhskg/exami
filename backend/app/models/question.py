@@ -68,7 +68,10 @@ class Question(Base):
     topic = relationship("Topic", back_populates="questions")
     source_chunk = relationship("ContentChunk", back_populates="questions")
     options = relationship(
-        "QuestionOption", back_populates="question", cascade="all, delete-orphan"
+        "QuestionOption",
+        back_populates="question",
+        cascade="all, delete-orphan",
+        order_by="QuestionOption.option_order",
     )
     tags = relationship("Tag", secondary=question_tags, back_populates="questions")
     exam_responses = relationship("ExamResponse", back_populates="question")

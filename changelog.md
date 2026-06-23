@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCQ Option Randomization**: Implemented option shuffling in `generate_questions()` using Python's `random.shuffle` before saving options. Shuffled options are mapped to `option_order` sequentially, guaranteeing correct option randomization.
+- **SQLAlchemy Options Ordering**: Configured `Question.options` relationship in `backend/app/models/question.py` with `order_by="QuestionOption.option_order"` to automatically fetch options sorted by `option_order` across all backend API models and serializations.
 - **Question Bank Analytics Dashboard**: Integrated a comprehensive, highly aesthetic analytics panel at the top of the Questions Bank view.
   - Left Column: Topic-specific stats showing Easy, Medium, and Hard question counts, a horizontal segmented/stacked progress bar showing the difficulty distribution, and a concept/tag frequency breakdown.
   - Right Column: Global subject/topic breakdown showing the total question counts across all of the user's topics, highlighting the currently active topic.
@@ -29,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Knowledge Catalog Dashboard**: Integrated a new sidebar tab and [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx) client sub-view for comprehensive catalog administration (Documents, Embeddings/Chunks, Questions, and Tags).
 
 ### Fixed
+- **Question Generation Failures (>10 Qs)**: Sliced question generation requests into batches of at most 5 questions in `backend/app/services/question_bank.py` to prevent API rate limits, response token exhaustion, timeouts, and JSON decode failures. Implemented resilient try-except block parsing per-question to avoid single-question failures from crashing the entire generation request.
+- **Practice Mode Test Alignment**: Updated practice mode session assertion in `backend/app/tests/test_exams.py` to align with the recently introduced practice mode explanation feature, resolving a test suite failure.
 - **Dropdown Option Menu Theming**: Fixed the dropdown select element glitch where options had white font on white background in Chromium browsers. Added `color-scheme: dark;` to `:root` and explicit styling on `select option` to use `var(--bg-secondary)` as the background and `var(--text-primary)` as the text color.
 - **TypeScript Compiler Errors**: Resolved TypeScript compile errors:
   - Fixed implicit `any` parameter warning in the immediate explanation sentence mapping on `App.tsx` (line 3395) by adding explicit types `(sentence: string, idx: number)`.
