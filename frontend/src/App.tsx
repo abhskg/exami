@@ -70,6 +70,14 @@ function App() {
   const [jobStatus, setJobStatus] = useState<string>('');
   const [jobMessage, setJobMessage] = useState<string>('');
   
+  // Ingestion Method & new forms state
+  const [ingestionMethod, setIngestionMethod] = useState<'upload' | 'raw_text' | 'web_search'>('upload');
+  const [rawTextTitle, setRawTextTitle] = useState<string>('');
+  const [rawTextContent, setRawTextContent] = useState<string>('');
+  const [webSearchTitle, setWebSearchTitle] = useState<string>('');
+  const [webSearchSyllabus, setWebSearchSyllabus] = useState<string>('');
+  const [webSearchTopics, setWebSearchTopics] = useState<string>('');
+  
   // Toast Alert state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -312,6 +320,90 @@ function App() {
     } catch (err) {
       console.error("Upload error:", err);
       showToast("Network error uploading document.", "error");
+      setUploading(false);
+    }
+  };
+
+  // 7b. Trigger Raw Text Ingestion Job
+  const handleIngestRawText = async () => {
+    if (!rawTextTitle.trim() || !rawTextContent.trim() || !selectedTopic || !token) return;
+    
+    setUploading(true);
+    setJobProgress(0);
+    setJobStatus('sending');
+    setJobMessage('Sending text content to server...');
+    
+    try {
+      const res = await fetch(`${apiUrl}/api/documents/raw-text`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic_id: selectedTopic.id,
+          title: rawTextTitle.trim(),
+          content: rawTextContent.trim()
+        })
+      });
+      
+      const data = await res.json();
+      if (res.status === 202) {
+        const jobId = data.job_id;
+        showToast("Raw text ingestion started. Processing in background...", "info");
+        setRawTextTitle('');
+        setRawTextContent('');
+        pollJobStatus(jobId);
+      } else {
+        showToast(data.detail || "Failed to ingest raw text.", "error");
+        setUploading(false);
+      }
+    } catch (err) {
+      console.error("Raw text ingest error:", err);
+      showToast("Network error ingesting raw text.", "error");
+      setUploading(false);
+    }
+  };
+
+  // 7c. Trigger Web Search Ingestion Job
+  const handleIngestWebSearch = async () => {
+    if (!webSearchTitle.trim() || !webSearchSyllabus.trim() || !webSearchTopics.trim() || !selectedTopic || !token) return;
+    
+    setUploading(true);
+    setJobProgress(0);
+    setJobStatus('searching');
+    setJobMessage('Triggering web search parser agents...');
+    
+    try {
+      const res = await fetch(`${apiUrl}/api/documents/web-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic_id: selectedTopic.id,
+          title: webSearchTitle.trim(),
+          syllabus: webSearchSyllabus.trim(),
+          topics: webSearchTopics.trim()
+        })
+      });
+      
+      const data = await res.json();
+      if (res.status === 202) {
+        const jobId = data.job_id;
+        showToast("Simulated web parser run started. Processing in background...", "info");
+        setWebSearchTitle('');
+        setWebSearchSyllabus('');
+        setWebSearchTopics('');
+        pollJobStatus(jobId);
+      } else {
+        showToast(data.detail || "Failed to trigger web search.", "error");
+        setUploading(false);
+      }
+    } catch (err) {
+      console.error("Web search ingest error:", err);
+      showToast("Network error triggering web search.", "error");
       setUploading(false);
     }
   };
@@ -1142,110 +1234,311 @@ function App() {
 
                 <div className="form-group" style={{ marginBottom: '24px' }}>
                   <label>2. Choose Ingestion Method</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
-                    <div style={{ border: '1px solid var(--accent-primary)', padding: '16px', borderRadius: '8px', cursor: 'pointer', background: 'rgba(99, 102, 241, 0.05)' }}>
-                      <strong style={{ display: 'block', marginBottom: '4px' }}>File Upload</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Upload PDF, Markdown or TXT syllabus document.</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '4px' }}>
+                    {/* Method 1: File Upload */}
+                    <div 
+                      onClick={() => !uploading && setIngestionMethod('upload')}
+                      style={{ 
+                        border: ingestionMethod === 'upload' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
+                        padding: '16px', 
+                        borderRadius: '8px', 
+                        cursor: uploading ? 'not-allowed' : 'pointer', 
+                        background: ingestionMethod === 'upload' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'upload' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>File Upload</strong>
+                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'upload' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Upload PDF, MD, or TXT document.</span>
                     </div>
-                    <div style={{ border: '1px solid var(--border-color)', padding: '16px', borderRadius: '8px', cursor: 'not-allowed', opacity: 0.5 }}>
-                      <strong style={{ display: 'block', marginBottom: '4px' }}>Syllabus Text Input</strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Paste raw syllabus requirements text (Coming soon).</span>
+
+                    {/* Method 2: Raw Text Paste */}
+                    <div 
+                      onClick={() => !uploading && setIngestionMethod('raw_text')}
+                      style={{ 
+                        border: ingestionMethod === 'raw_text' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
+                        padding: '16px', 
+                        borderRadius: '8px', 
+                        cursor: uploading ? 'not-allowed' : 'pointer', 
+                        background: ingestionMethod === 'raw_text' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'raw_text' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>Raw Text</strong>
+                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'raw_text' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Paste raw text contents directly.</span>
+                    </div>
+
+                    {/* Method 3: Web Search/Parse */}
+                    <div 
+                      onClick={() => !uploading && setIngestionMethod('web_search')}
+                      style={{ 
+                        border: ingestionMethod === 'web_search' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', 
+                        padding: '16px', 
+                        borderRadius: '8px', 
+                        cursor: uploading ? 'not-allowed' : 'pointer', 
+                        background: ingestionMethod === 'web_search' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <strong style={{ display: 'block', marginBottom: '4px', color: ingestionMethod === 'web_search' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>Web Search</strong>
+                      <span style={{ fontSize: '0.75rem', color: ingestionMethod === 'web_search' ? 'var(--text-secondary)' : 'var(--text-muted)' }}>Provide syllabus & topics to agent.</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Drag and Drop Zone */}
-                <div 
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onClick={() => !uploading && fileInputRef.current?.click()}
-                  style={{ 
-                    border: '2px dashed var(--border-color)', 
-                    borderRadius: '12px', 
-                    padding: '32px', 
-                    textAlign: 'center', 
-                    marginBottom: '24px',
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    background: 'rgba(255,255,255,0.01)',
-                    transition: 'border-color 0.2s ease',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!uploading) e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!uploading) e.currentTarget.style.borderColor = 'var(--border-color)';
-                  }}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    accept=".pdf,.txt,.md"
-                    style={{ display: 'none' }}
-                    disabled={uploading}
-                  />
-                  <Upload size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
-                  {selectedFile ? (
-                    <div>
-                      <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                        {selectedFile.name}
-                      </p>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {formatBytes(selectedFile.size)}
-                      </span>
+                {/* Form Section based on Selected Method */}
+                {ingestionMethod === 'upload' && (
+                  <>
+                    {/* Drag and Drop Zone */}
+                    <div 
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={() => !uploading && fileInputRef.current?.click()}
+                      style={{ 
+                        border: '2px dashed var(--border-color)', 
+                        borderRadius: '12px', 
+                        padding: '32px', 
+                        textAlign: 'center', 
+                        marginBottom: '24px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        background: 'rgba(255,255,255,0.01)',
+                        transition: 'border-color 0.2s ease',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!uploading) e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!uploading) e.currentTarget.style.borderColor = 'var(--border-color)';
+                      }}
+                    >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept=".pdf,.txt,.md"
+                        style={{ display: 'none' }}
+                        disabled={uploading}
+                      />
+                      <Upload size={32} color="var(--text-muted)" style={{ marginBottom: '12px' }} />
+                      {selectedFile ? (
+                        <div>
+                          <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                            {selectedFile.name}
+                          </p>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {formatBytes(selectedFile.size)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                            Drag & drop documents here, or click to select file
+                          </p>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Supports PDF, MD, TXT (Max 15MB)
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div>
-                      <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                        Drag & drop documents here, or click to select file
-                      </p>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Supports PDF, MD, TXT (Max 15MB)
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                {/* Progress bar during uploads */}
-                {uploading && (
-                  <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
-                      </span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                        {jobProgress}%
-                      </span>
-                    </div>
-                    {/* Background Progress Bar */}
-                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ 
-                        height: '100%', 
-                        width: `${jobProgress}%`, 
-                        background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
-                        borderRadius: '3px',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                  </div>
+                    {/* Progress bar during uploads */}
+                    {uploading && (
+                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                            {jobProgress}%
+                          </span>
+                        </div>
+                        {/* Background Progress Bar */}
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            height: '100%', 
+                            width: `${jobProgress}%`, 
+                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                            borderRadius: '3px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      disabled={!selectedFile || uploading || !selectedTopic}
+                      onClick={handleIngestFile}
+                      className="btn btn-primary" 
+                      style={{ width: '100%' }}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Vectorizing Document...</span>
+                        </>
+                      ) : (
+                        'Submit and Run Ingestion'
+                      )}
+                    </button>
+                  </>
                 )}
 
-                <button 
-                  disabled={!selectedFile || uploading || !selectedTopic}
-                  onClick={handleIngestFile}
-                  className="btn btn-primary" 
-                  style={{ width: '100%' }}
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Vectorizing Document...</span>
-                    </>
-                  ) : (
-                    'Submit and Run Ingestion'
-                  )}
-                </button>
+                {ingestionMethod === 'raw_text' && (
+                  <>
+                    <div className="form-group">
+                      <label>Document Title</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g., Intro to Algorithms Notes" 
+                        value={rawTextTitle}
+                        onChange={(e) => setRawTextTitle(e.target.value)}
+                        disabled={uploading}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    
+                    <div className="form-group" style={{ marginBottom: '24px' }}>
+                      <label>Paste Document Contents</label>
+                      <textarea 
+                        required
+                        rows={6}
+                        placeholder="Paste the raw text here for chunking and question generation..." 
+                        value={rawTextContent}
+                        onChange={(e) => setRawTextContent(e.target.value)}
+                        disabled={uploading}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    {/* Progress bar during uploads */}
+                    {uploading && (
+                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                            {jobProgress}%
+                          </span>
+                        </div>
+                        {/* Background Progress Bar */}
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            height: '100%', 
+                            width: `${jobProgress}%`, 
+                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                            borderRadius: '3px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      disabled={!rawTextTitle.trim() || !rawTextContent.trim() || uploading || !selectedTopic}
+                      onClick={handleIngestRawText}
+                      className="btn btn-primary" 
+                      style={{ width: '100%' }}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Vectorizing Raw Text...</span>
+                        </>
+                      ) : (
+                        'Submit and Chunk Raw Text'
+                      )}
+                    </button>
+                  </>
+                )}
+
+                {ingestionMethod === 'web_search' && (
+                  <>
+                    <div className="form-group">
+                      <label>Search Title</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g., Kubernetes Core Concepts" 
+                        value={webSearchTitle}
+                        onChange={(e) => setWebSearchTitle(e.target.value)}
+                        disabled={uploading}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Syllabus Requirements</label>
+                      <textarea 
+                        required
+                        rows={2}
+                        placeholder="Provide the syllabus outline to focus..." 
+                        value={webSearchSyllabus}
+                        onChange={(e) => setWebSearchSyllabus(e.target.value)}
+                        disabled={uploading}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                      <label>Topics to Search / Parse</label>
+                      <textarea 
+                        required
+                        rows={2}
+                        placeholder="List of search terms (e.g. pods, services, deployments)..." 
+                        value={webSearchTopics}
+                        onChange={(e) => setWebSearchTopics(e.target.value)}
+                        disabled={uploading}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <div style={{ padding: '12px', borderRadius: '8px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                      <strong>Agent Parse Simulation Note:</strong> Web search parsing is simulated. Clicking submit will automatically run web search agents (simulated corpus assembly) and ingest the results.
+                    </div>
+
+                    {/* Progress bar during uploads */}
+                    {uploading && (
+                      <div style={{ marginBottom: '24px', padding: '16px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {jobStatus.toUpperCase() === 'PENDING' ? 'Queuing Ingestion Task...' : jobMessage}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                            {jobProgress}%
+                          </span>
+                        </div>
+                        {/* Background Progress Bar */}
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            height: '100%', 
+                            width: `${jobProgress}%`, 
+                            background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                            borderRadius: '3px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      disabled={!webSearchTitle.trim() || !webSearchSyllabus.trim() || !webSearchTopics.trim() || uploading || !selectedTopic}
+                      onClick={handleIngestWebSearch}
+                      className="btn btn-primary" 
+                      style={{ width: '100%' }}
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Triggering Parser Agents...</span>
+                        </>
+                      ) : (
+                        'Run Agent Parser (Placeholder)'
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
 
               <div>
@@ -1296,7 +1589,9 @@ function App() {
                               {doc.original_filename}
                             </strong>
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              Type: {doc.source_type === 'upload_pdf' ? 'PDF Document' : 'Text/Markdown'}
+                              Type: {doc.source_type === 'upload_pdf' ? 'PDF Document' : 
+                                     doc.source_type === 'manual_topic_text' ? 'Raw Text Ingest' : 
+                                     doc.source_type === 'web_scan' ? 'Web Search/Parse (Simulated)' : 'Text/Markdown'}
                             </span>
                           </div>
                         </div>

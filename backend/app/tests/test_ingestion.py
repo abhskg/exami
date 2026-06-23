@@ -152,3 +152,103 @@ def test_successful_upload_and_polling(client, db):
     # Cleanup file
     if os.path.exists(doc_in_db.storage_path):
         os.remove(doc_in_db.storage_path)
+
+
+def test_raw_text_ingestion(client, db):
+    headers = get_auth_headers(client)
+    
+    # Create topic
+    res = client.post(
+        "/api/topics/",
+        json={"name": "Raw Text Topic", "description": "Testing raw text"},
+        headers=headers
+    )
+    topic_id = res.json()["id"]
+    
+    # Ingest raw text
+    res = client.post(
+        "/api/documents/raw-text",
+        json={
+            "topic_id": topic_id,
+            "title": "Raw text sample",
+            "content": "This is a raw text content chunk for testing. It has multiple sentences to be parsed."
+        },
+        headers=headers
+    )
+    assert res.status_code == status.HTTP_202_ACCEPTED
+    data = res.json()
+    assert "document" in data
+    assert "job_id" in data
+    
+    document_id = data["document"]["id"]
+    job_id = data["job_id"]
+    
+    doc_in_db = db.query(Document).filter(Document.id == document_id).first()
+    assert doc_in_db is not None
+    assert doc_in_db.status == "pending"
+    assert doc_in_db.source_type == "manual_topic_text"
+    assert os.path.exists(doc_in_db.storage_path)
+    
+    # Run the worker synchronously
+    process_document_task(job_id, document_id, doc_in_db.user_id, db=db)
+    
+    db.expire_all()
+    assert doc_in_db.status == "parsed"
+    
+    # Cleanup file
+    if os.path.exists(doc_in_db.storage_path):
+        os.remove(doc_in_db.storage_path)
+
+
+def test_web_search_ingestion(client, db):
+    headers = get_auth_headers(client)
+    
+    # Create topic
+    res = client.post(
+        "/api/topics/",
+        json={"name": "Web Search Topic", "description": "Testing web search"},
+        headers=headers
+    )
+    topic_id = res.json()["id"]
+    
+    # Ingest web search placeholder
+    res = client.post(
+        "/api/documents/web-search",
+        json={
+            "topic_id": topic_id,
+            "title": "Web search sample",
+            "syllabus": "List of sorting algorithms",
+            "topics": "QuickSort, MergeSort, BubbleSort"
+        },
+        headers=headers
+    )
+    assert res.status_code == status.HTTP_202_ACCEPTED
+    data = res.json()
+    assert "document" in data
+    assert "job_id" in data
+    
+    document_id = data["document"]["id"]
+    job_id = data["job_id"]
+    
+    doc_in_db = db.query(Document).filter(Document.id == document_id).first()
+    assert doc_in_db is not None
+    assert doc_in_db.status == "pending"
+    assert doc_in_db.source_type == "web_scan"
+    assert os.path.exists(doc_in_db.storage_path)
+    
+    # Run the worker synchronously
+    process_document_task(job_id, document_id, doc_in_db.user_id, db=db)
+    
+    db.expire_all()
+    assert doc_in_db.status == "parsed"
+    
+    # Verify file content
+    with open(doc_in_db.storage_path, "r", encoding="utf-8") as f:
+        file_text = f.read()
+        assert "Web Search Parser Agent" in file_text
+        assert "QuickSort" in file_text
+        
+    # Cleanup file
+    if os.path.exists(doc_in_db.storage_path):
+        os.remove(doc_in_db.storage_path)
+
