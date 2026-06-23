@@ -92,10 +92,8 @@ def _build_session_response(session: ExamSession, db: Session) -> ExamSessionRes
 
         tags_list = [tag.name for tag in q.tags]
 
-        # Reveal explanation only if session is completed OR in practice mode after answering
-        reveal_q_explanation = (session.status == "completed") or (
-            session.mode == "practice" and q.id in answered_question_ids
-        )
+        # Reveal explanation if session is completed OR if it's practice mode
+        reveal_q_explanation = (session.status == "completed") or (session.mode == "practice")
 
         questions_out.append(
             ExamQuestionResponse(
