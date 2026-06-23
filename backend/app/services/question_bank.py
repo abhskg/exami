@@ -48,12 +48,35 @@ def _embed_query(query_text: str) -> list[float]:
 
     try:
         from google import genai  # type: ignore
+        import time
 
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        response = client.models.embed_content(
-            model="text-embedding-004",
-            contents=[query_text],
-        )
+        
+        # Simple retry loop for 429 rate limits
+        max_retries = 5
+        initial_delay = 2.0
+        backoff_factor = 2.0
+        delay = initial_delay
+        
+        for attempt in range(max_retries):
+            try:
+                response = client.models.embed_content(
+                    model="text-embedding-004",
+                    contents=[query_text],
+                )
+                break
+            except Exception as e:
+                err_msg = str(e)
+                if ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg) and attempt < max_retries - 1:
+                    logger.warning(
+                        f"Gemini embed_content rate limited (429) on query embedding. "
+                        f"Retrying in {delay}s (attempt {attempt + 1}/{max_retries})...."
+                    )
+                    time.sleep(delay)
+                    delay *= backoff_factor
+                else:
+                    raise e
+                    
         return list(response.embeddings[0].values)
     except Exception as e:
         logger.error(f"Gemini embed_content failed: {e}. Using zeroed mock vector.")
@@ -94,15 +117,38 @@ def _call_gemini_generate(prompt: str) -> list[dict]:
     try:
         from google import genai  # type: ignore
         from google.genai import types  # type: ignore
+        import time
 
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
-        )
+        
+        # Simple retry loop for 429 rate limits
+        max_retries = 5
+        initial_delay = 2.0
+        backoff_factor = 2.0
+        delay = initial_delay
+        
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    ),
+                )
+                break
+            except Exception as e:
+                err_msg = str(e)
+                if ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg) and attempt < max_retries - 1:
+                    logger.warning(
+                        f"Gemini generate_content rate limited (429). "
+                        f"Retrying in {delay}s (attempt {attempt + 1}/{max_retries})..."
+                    )
+                    time.sleep(delay)
+                    delay *= backoff_factor
+                else:
+                    raise e
+                    
         raw = response.text.strip()
         parsed = json.loads(raw)
         # Accept either a bare list or {"questions": [...]}

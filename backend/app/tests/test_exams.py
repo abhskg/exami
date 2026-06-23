@@ -341,35 +341,33 @@ class TestExamEngineAPI:
 
 
         # Submit answers
-        # Q1: Correct (Option A, id is opt_correct)
-        q1 = session_data["questions"][0]
-        db_q1 = db.query(Question).filter(Question.id == uuid.UUID(q1["id"])).first()
-        q1_correct_opt = next(o for o in db_q1.options if o.is_correct)
+        # seeded_questions[0]: Correct (Option A, id is opt_correct)
+        q0_id = str(seeded_questions[0].id)
+        q0_correct_opt = next(o for o in seeded_questions[0].options if o.is_correct)
         client.post(
             f"/api/exams/sessions/{session_id}/submit-answer",
             json={
-                "question_id": q1["id"],
-                "selected_option_id": str(q1_correct_opt.id),
+                "question_id": q0_id,
+                "selected_option_id": str(q0_correct_opt.id),
                 "time_taken_seconds": 10,
             },
             headers=auth_headers,
         )
 
-        # Q2: Incorrect (Option B, is not correct)
-        q2 = session_data["questions"][1]
-        db_q2 = db.query(Question).filter(Question.id == uuid.UUID(q2["id"])).first()
-        q2_incorrect_opt = next(o for o in db_q2.options if not o.is_correct)
+        # seeded_questions[1]: Incorrect (Option B, is not correct)
+        q1_id = str(seeded_questions[1].id)
+        q1_incorrect_opt = next(o for o in seeded_questions[1].options if not o.is_correct)
         client.post(
             f"/api/exams/sessions/{session_id}/submit-answer",
             json={
-                "question_id": q2["id"],
-                "selected_option_id": str(q2_incorrect_opt.id),
+                "question_id": q1_id,
+                "selected_option_id": str(q1_incorrect_opt.id),
                 "time_taken_seconds": 20,
             },
             headers=auth_headers,
         )
 
-        # Q3: Skipped (no answer submitted)
+        # seeded_questions[2]: Skipped (no answer submitted)
 
         # Conclude the session
         client.post(
