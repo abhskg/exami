@@ -7,7 +7,7 @@ from app.models.content_chunk import ContentChunk
 from app.models.job import Job
 from app.core.config import settings
 from app.core.database import SessionLocal
-from google import genai
+
 
 logger = logging.getLogger(__name__)
 
@@ -50,65 +50,23 @@ def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> l
 
 def get_embeddings(chunks: list[str]) -> list[list[float]]:
     """
-    Call Gemini API to generate embeddings for list of chunks.
-    Falls back to mock embeddings in test environment or if API key is not configured.
+    Call centralized llm_service to generate embeddings for a list of chunks.
+    Processes in batches of 10 to respect rate limits.
     """
-    is_mock = (
-        not settings.GEMINI_API_KEY or 
-        settings.GEMINI_API_KEY == "your-gemini-api-key-here" or
-        settings.APP_ENV == "test"
-    )
-    
-    if is_mock:
-        logger.warning("Using mock embeddings (no valid GEMINI_API_KEY or in test).")
-        return [[0.1 * (idx % 10)] * settings.EMBEDDING_DIMENSION for idx in range(len(chunks))]
+    import time
+    from app.services import llm_service
+    embeddings = []
+    batch_size = 10
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i : i + batch_size]
+        batch_embs = llm_service.embed_text(batch)
+        embeddings.extend(batch_embs)
         
-    try:
-        import time
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        embeddings = []
-        batch_size = 10
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
+        # Respect rate limits on multiple batches
+        if i + batch_size < len(chunks):
+            time.sleep(1.0)
             
-            # Simple retry loop for 429 rate limits
-            max_retries = 5
-            initial_delay = 2.0
-            backoff_factor = 2.0
-            delay = initial_delay
-            
-            for attempt in range(max_retries):
-                try:
-                    response = client.models.embed_content(
-                        model="text-embedding-004",
-                        contents=batch
-                    )
-                    break
-                except Exception as e:
-                    err_msg = str(e)
-                    if ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg) and attempt < max_retries - 1:
-                        logger.warning(
-                            f"Gemini embed_content rate limited (429) on batch. "
-                            f"Retrying in {delay}s (attempt {attempt + 1}/{max_retries})..."
-                        )
-                        time.sleep(delay)
-                        delay *= backoff_factor
-                    else:
-                        raise e
-            
-            for emb in response.embeddings:
-                embeddings.append(emb.values)
-                
-            # Add a small delay between batches to respect free tier rate limits
-            if i + batch_size < len(chunks):
-                time.sleep(1.0)
-                
-        return embeddings
-    except Exception as e:
-        logger.error(f"Error calling Gemini API: {e}. Falling back to mock embeddings in local/debug environment.")
-        if settings.APP_ENV == "local" or settings.DEBUG:
-            return [[0.1 * (idx % 10)] * settings.EMBEDDING_DIMENSION for idx in range(len(chunks))]
-        raise e
+    return embeddings
 
 def process_document_task(job_id: uuid.UUID, document_id: uuid.UUID, user_id: uuid.UUID, db=None) -> None:
     """

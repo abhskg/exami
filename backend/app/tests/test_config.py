@@ -26,7 +26,6 @@ def test_settings_missing_fields(monkeypatch):
     # Ensure environment variables are clear
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("SECRET_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     with pytest.raises(ValidationError) as exc_info:
         # Pass _env_file=None to ignore the backend/.env file and system env
@@ -37,4 +36,3 @@ def test_settings_missing_fields(monkeypatch):
     
     assert "DATABASE_URL" in missing_fields
     assert "SECRET_KEY" in missing_fields
-    assert "GEMINI_API_KEY" in missing_fields

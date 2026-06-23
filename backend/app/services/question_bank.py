@@ -32,150 +32,19 @@ logger = logging.getLogger(__name__)
 
 def _embed_query(query_text: str) -> list[float]:
     """
-    Embed a single query string using the Gemini text-embedding-004 model.
-    Falls back to a zeroed mock vector when no valid API key is configured or
-    the environment is set to 'test'.
+    Embed a single query string using centralized llm_service.
     """
-    is_mock = (
-        not settings.GEMINI_API_KEY
-        or settings.GEMINI_API_KEY == "your-gemini-api-key-here"
-        or settings.APP_ENV == "test"
-    )
-
-    if is_mock:
-        logger.warning("Using mock query embedding (no valid GEMINI_API_KEY or in test).")
-        return [0.0] * settings.EMBEDDING_DIMENSION
-
-    try:
-        from google import genai  # type: ignore
-        import time
-
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        
-        # Simple retry loop for 429 rate limits
-        max_retries = 5
-        initial_delay = 2.0
-        backoff_factor = 2.0
-        delay = initial_delay
-        
-        for attempt in range(max_retries):
-            try:
-                response = client.models.embed_content(
-                    model="text-embedding-004",
-                    contents=[query_text],
-                )
-                break
-            except Exception as e:
-                err_msg = str(e)
-                if ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg) and attempt < max_retries - 1:
-                    logger.warning(
-                        f"Gemini embed_content rate limited (429) on query embedding. "
-                        f"Retrying in {delay}s (attempt {attempt + 1}/{max_retries})...."
-                    )
-                    time.sleep(delay)
-                    delay *= backoff_factor
-                else:
-                    raise e
-                    
-        return list(response.embeddings[0].values)
-    except Exception as e:
-        logger.error(f"Gemini embed_content failed: {e}. Using zeroed mock vector.")
-        if settings.APP_ENV == "local" or settings.DEBUG:
-            return [0.0] * settings.EMBEDDING_DIMENSION
-        raise
+    from app.services import llm_service
+    embs = llm_service.embed_text([query_text])
+    return embs[0]
 
 
-def _call_gemini_generate(prompt: str) -> list[dict]:
+def _call_llm_generate(prompt: str, count: int, difficulty: str) -> list[dict]:
     """
-    Call the Gemini generative model with a structured JSON output request.
-    Returns a list of raw MCQ dicts parsed from the response.
-    Falls back to a single mock MCQ in test / no-key environments.
+    Call centralized llm_service to generate MCQs.
     """
-    is_mock = (
-        not settings.GEMINI_API_KEY
-        or settings.GEMINI_API_KEY == "your-gemini-api-key-here"
-        or settings.APP_ENV == "test"
-    )
-
-    if is_mock:
-        logger.warning("Using mock MCQ generation (no valid GEMINI_API_KEY or in test).")
-        return [
-            {
-                "question_text": "Mock question generated in test environment?",
-                "options": [
-                    {"text": "Correct mock answer", "is_correct": True},
-                    {"text": "Wrong answer A", "is_correct": False},
-                    {"text": "Wrong answer B", "is_correct": False},
-                    {"text": "Wrong answer C", "is_correct": False},
-                ],
-                "explanation": "This is a mock explanation for testing purposes.",
-                "tags": ["mock", "test"],
-                "difficulty": "medium",
-            }
-        ]
-
-    try:
-        from google import genai  # type: ignore
-        from google.genai import types  # type: ignore
-        import time
-
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        
-        # Simple retry loop for 429 rate limits
-        max_retries = 5
-        initial_delay = 2.0
-        backoff_factor = 2.0
-        delay = initial_delay
-        
-        for attempt in range(max_retries):
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                    ),
-                )
-                break
-            except Exception as e:
-                err_msg = str(e)
-                if ("429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg) and attempt < max_retries - 1:
-                    logger.warning(
-                        f"Gemini generate_content rate limited (429). "
-                        f"Retrying in {delay}s (attempt {attempt + 1}/{max_retries})..."
-                    )
-                    time.sleep(delay)
-                    delay *= backoff_factor
-                else:
-                    raise e
-                    
-        raw = response.text.strip()
-        parsed = json.loads(raw)
-        # Accept either a bare list or {"questions": [...]}
-        if isinstance(parsed, list):
-            return parsed
-        if isinstance(parsed, dict) and "questions" in parsed:
-            return parsed["questions"]
-        logger.error(f"Unexpected Gemini JSON structure: {type(parsed)}")
-        return []
-    except Exception as e:
-        logger.error(f"Gemini generate_content failed: {e}. Falling back to mock.")
-        if settings.APP_ENV == "local" or settings.DEBUG:
-            return [
-                {
-                    "question_text": f"Fallback question (API error: {str(e)[:60]})",
-                    "options": [
-                        {"text": "Option A (correct)", "is_correct": True},
-                        {"text": "Option B", "is_correct": False},
-                        {"text": "Option C", "is_correct": False},
-                        {"text": "Option D", "is_correct": False},
-                    ],
-                    "explanation": "API call failed; this is a fallback MCQ.",
-                    "tags": ["fallback"],
-                    "difficulty": "medium",
-                }
-            ]
-        raise
+    from app.services import llm_service
+    return llm_service.generate_mcqs(prompt, count, difficulty)
 
 
 # ---------------------------------------------------------------------------
@@ -342,8 +211,8 @@ OUTPUT FORMAT (strict JSON array — no markdown fences, no extra text):
   }}
 ]"""
 
-    # --- Step 4: Call Gemini --------------------------------------------------
-    raw_mcqs = _call_gemini_generate(prompt)
+    # --- Step 4: Call LLM -----------------------------------------------------
+    raw_mcqs = _call_llm_generate(prompt, count, difficulty)
 
     # --- Step 5: Persist to DB ------------------------------------------------
     saved_questions: list[Question] = []

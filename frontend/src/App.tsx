@@ -52,6 +52,10 @@ function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'setup' | 'exam' | 'results'>('dashboard');
   const [dbConnected, setDbConnected] = useState<boolean>(false);
   
+  // Active LLM & Embedding provider info from backend
+  const [llmProvider, setLlmProvider] = useState<string>('gemini');
+  const [embeddingProvider, setEmbeddingProvider] = useState<string>('gemini');
+  
   // Topics & Documents state
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -118,12 +122,19 @@ function App() {
     setTimeout(() => setToast(null), 5000);
   };
 
-  // 1. Health check: check if database backend is online
+  // 1. Health check: check if database backend is online and query active settings
   const checkHealth = async () => {
     try {
       const res = await fetch(`${apiUrl}/health`);
       if (res.ok) {
         setDbConnected(true);
+        const data = await res.json();
+        if (data.llm_provider) {
+          setLlmProvider(data.llm_provider);
+        }
+        if (data.embedding_provider) {
+          setEmbeddingProvider(data.embedding_provider);
+        }
       } else {
         setDbConnected(false);
       }
@@ -441,7 +452,7 @@ function App() {
             if (job.progress < 30) setJobMessage("Parsing document structures...");
             else if (job.progress < 50) setJobMessage("Extracting text contents...");
             else if (job.progress < 70) setJobMessage("Partitioning semantic chunks...");
-            else if (job.progress < 90) setJobMessage("Generating vector embeddings (Gemini API)...");
+            else if (job.progress < 90) setJobMessage(`Generating vector embeddings (${embeddingProvider.toUpperCase()} API)...`);
             else setJobMessage("Writing segments to pgvector database...");
           }
         }
@@ -708,7 +719,7 @@ function App() {
   const handleGenerateAllQuestions = async () => {
     if (!selectedTopic || !token) return;
     setIsGeneratingAllQuestions(true);
-    showToast("Generating questions using Gemini AI...", "info");
+    showToast(`Generating questions using ${llmProvider.toUpperCase()} AI...`, "info");
     try {
       const res = await fetch(`${apiUrl}/api/questions/generate`, {
         method: 'POST',
@@ -1124,7 +1135,7 @@ function App() {
               <div style={{ position: 'relative', zIndex: 2 }}>
                 <h1 style={{ marginBottom: '12px' }}>Welcome to ExamPrep AI!</h1>
                 <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', fontSize: '1.05rem', marginBottom: '20px' }}>
-                  A local-first environment for document parsing, semantic chunk database search, and automated mock exam preparation using pgvector and Gemini APIs.
+                  A local-first environment for document parsing, semantic chunk database search, and automated mock exam preparation using pgvector and configured LLMs.
                 </p>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button onClick={() => setActiveTab('setup')} className="btn btn-primary">

@@ -13,9 +13,9 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 ## 📸 Main Features
 
 *   **🔒 Complete Workspace Isolation**: User data is isolated at the API and database levels by `user_id` to guarantee secure workspaces.
-*   **📚 Fluid Knowledge Growth**: Upload documents to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
-*   **🧠 Intelligent Chunking & Embedding**: Extract text from PDFs or markdown documents, parse into manageable segments, generate semantic vectors via the Gemini API (`text-embedding-004`), and store them using `pgvector`.
-*   **📝 Dynamic Structured Question Bank**: Automatically generate structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the Gemini API.
+*   **📚 Fluid Knowledge Growth**: Ingest documents using three methods (File Upload, Raw Text Paste, and Web Search Agent simulation) to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
+*   **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `text-embedding-004`), and store them using `pgvector`.
+*   **📝 Dynamic Structured Question Bank**: Automatically generate structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-2.0-flash`).
 *   **⏱️ Dual Exam Simulator Modes**:
     *   *Practice Mode*: Provides instant explanations and correction feedback as you complete each question.
     *   *Timed Mode*: Simulates standard test environments. Enforces hard countdown limits, locks answers, and hides explanation analytics until the exam is fully completed.
@@ -30,7 +30,7 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 | **Frontend** | React (Vite + TypeScript) | Responsive interface built with modern Vanilla CSS, glassmorphic styling foundations, and state persistence. |
 | **Backend** | FastAPI (Python) | High-performance async REST API with auto-generated OpenAPI documentation. |
 | **Database** | PostgreSQL + `pgvector` | Standard database engine configured to handle relational records alongside vector similarity dimensions (default: 768). |
-| **AI/LLM** | Gemini API | Powered by Google GenAI SDK for vector embeddings (`text-embedding-004`) and structured JSON outputs. |
+| **AI/LLM** | Configurable LLM & Embeddings | Supports Gemini, OpenAI, LM Studio, or local servers. Embedded text vectorization and generation are dynamically routed. |
 | **Task Queue** | FastAPI Background Tasks | Light, in-process async background task worker managing ingestion queues and job tracking states. |
 | **Storage** | Local Filesystem | Raw files and documents organized under `./data/uploads/{user_id}/`. |
 

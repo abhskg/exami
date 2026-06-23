@@ -50,5 +50,7 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "environment": settings.APP_ENV
+        "environment": settings.APP_ENV,
+        "llm_provider": settings.LLM_PROVIDER,
+        "embedding_provider": settings.EMBEDDING_PROVIDER
     }
