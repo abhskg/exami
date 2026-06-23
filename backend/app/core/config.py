@@ -35,7 +35,8 @@ class Settings(BaseSettings):
 
     # Embedding Provider Configuration
     EMBEDDING_PROVIDER: str = "gemini"
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
+
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_BASE_URL: str = ""
 

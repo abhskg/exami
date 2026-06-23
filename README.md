@@ -14,8 +14,9 @@ Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designe
 
 - **🔒 Complete Workspace Isolation**: User data is isolated at the API and database levels by `user_id` to guarantee secure workspaces.
 - **📚 Fluid Knowledge Growth**: Ingest documents using three methods (File Upload, Raw Text Paste, and Web Search Agent simulation) to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
-- **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `text-embedding-004`), and store them using `pgvector`.
-- **📝 Dynamic Structured Question Bank**: Automatically generate structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-2.0-flash`).
+- **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `gemini-embedding-001`), and store them using `pgvector`.
+- **📝 Dynamic Structured Question Bank**: Automatically generate a customizable number of structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-2.0-flash`).
+
 - **⏱️ Dual Exam Simulator Modes**:
     - _Practice Mode_: Provides instant explanations and correction feedback as you complete each question.
     - _Timed Mode_: Simulates standard test environments. Enforces hard countdown limits, locks answers, and hides explanation analytics until the exam is fully completed.
@@ -181,7 +182,7 @@ The following variables in `backend/.env` control the active providers and limit
 | `LLM_PROVIDER`       | Provider for MCQ generation       | `gemini` (default), `openai`, `lmstudio`                    |
 | `LLM_MODEL`          | Specific model for MCQ generation | `gemini-2.0-flash`, `gpt-4o-mini`, custom local model       |
 | `EMBEDDING_PROVIDER` | Provider for text embeddings      | `gemini` (default), `openai`, `lmstudio`, `mock`            |
-| `EMBEDDING_MODEL`    | Model used for vector embeddings  | `text-embedding-004`, `text-embedding-3-small`, local model |
+| `EMBEDDING_MODEL`    | Model used for vector embeddings  | `gemini-embedding-001` (default), `text-embedding-3-small`, local model |
 | `MAX_FILE_SIZE_MB`   | Maximum allowed file upload size  | Integer value in MB (default: `15`)                         |
 
 ### Example Configurations
@@ -194,7 +195,7 @@ LLM_MODEL=gemini-2.0-flash
 GEMINI_API_KEY="your-gemini-api-key"
 
 EMBEDDING_PROVIDER=gemini
-EMBEDDING_MODEL=text-embedding-004
+EMBEDDING_MODEL=gemini-embedding-001
 ```
 
 #### 2. OpenAI

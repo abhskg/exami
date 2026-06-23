@@ -78,6 +78,8 @@ function App() {
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string>('');
   const [jobMessage, setJobMessage] = useState<string>('');
+  const [generateQuestionsCount, setGenerateQuestionsCount] = useState<number>(10);
+
 
   // Ingestion Method & new forms state
   const [ingestionMethod, setIngestionMethod] = useState<'upload' | 'raw_text' | 'web_search'>(
@@ -760,7 +762,7 @@ function App() {
         },
         body: JSON.stringify({
           topic_id: selectedTopic.id,
-          count: 10,
+          count: generateQuestionsCount,
           difficulty: 'mixed',
         }),
       });
@@ -2700,6 +2702,25 @@ function App() {
                       </strong>{' '}
                       {availableTags.length}
                     </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Generate count:</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-secondary)' }}>{generateQuestionsCount} Qs</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={30}
+                        value={generateQuestionsCount}
+                        onChange={e => setGenerateQuestionsCount(Number(e.target.value))}
+                        disabled={isGeneratingAllQuestions || !selectedTopic}
+                        style={{
+                          width: '100%',
+                          accentColor: 'var(--accent-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      />
+                    </div>
                     <button
                       onClick={handleGenerateAllQuestions}
                       disabled={isGeneratingAllQuestions || !selectedTopic}
@@ -2722,7 +2743,7 @@ function App() {
                       ) : (
                         <>
                           <Sparkles size={14} />
-                          <span>Generate 10 Questions</span>
+                          <span>Generate {generateQuestionsCount} Questions</span>
                         </>
                       )}
                     </button>

@@ -198,10 +198,11 @@ def embed_text(texts: list[str]) -> list[list[float]]:
         try:
             if provider == "gemini":
                 client = genai.Client(api_key=settings.GEMINI_API_KEY)
-                model_name = settings.EMBEDDING_MODEL or "text-embedding-004"
+                model_name = settings.EMBEDDING_MODEL or "gemini-embedding-001"
                 response = client.models.embed_content(
                     model=model_name,
                     contents=texts,
+                    config=types.EmbedContentConfig(output_dimensionality=settings.EMBEDDING_DIMENSION),
                 )
                 embeddings = [emb.values for emb in response.embeddings]
             elif provider in ("openai", "lmstudio"):

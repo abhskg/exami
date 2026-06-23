@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Configurable Ingestion File Size Limit**: Extracted the hardcoded 15MB file size limit to environment variables (`MAX_FILE_SIZE_MB` in backend and `VITE_MAX_FILE_SIZE_MB` in frontend). The frontend dynamically syncs this value from the backend's `/health` endpoint while defaulting to the environment configuration.
+- **Customizable Question Generation Count**: Introduced a dynamic question generation count selector (slider widget) in the frontend. Users can now choose to generate anywhere between 1 and 30 questions at once, replacing the previous hardcoded limit of 10.
 - **Knowledge Catalog Dashboard**: Integrated a new sidebar tab and [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx) client sub-view for comprehensive catalog administration (Documents, Embeddings/Chunks, Questions, and Tags).
+
+### Fixed
+- **Gemini Embedding Generation**: Resolved a 404 NOT_FOUND error during text embedding generation by changing the default embedding model from `text-embedding-004` to `gemini-embedding-001`. Configured the API call to pass `output_dimensionality` corresponding to settings `EMBEDDING_DIMENSION` (768).
+
 
 - **Document & Chunk CRUD APIs**: Implemented `PUT /api/documents/{id}` (rename), `DELETE /api/documents/{id}` (file and database cascade deletion), `GET /api/documents/{id}/chunks`, `PUT /api/documents/chunks/{id}` (updates chunk text and regenerates embedding vector), and `DELETE /api/documents/chunks/{id}`.
 - **Question & Tag CRUD APIs**: Implemented `PUT /api/questions/{id}` (full MCQ editor including options and tags), `DELETE /api/questions/{id}`, `PUT /api/questions/tags/{id}` (renames tag with duplicate merging support), and `DELETE /api/questions/tags/{id}`.
