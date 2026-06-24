@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import logo from './assets/exami_monogram_logo.png';
 import {
   Settings,
   ChevronRight,
@@ -1072,22 +1073,22 @@ function App() {
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '40px' }}>
             <div
+              className="logo-icon"
               style={{
-                background:
-                  'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '1.25rem',
-                color: '#fff',
-                fontFamily: 'var(--font-display)',
+                overflow: 'hidden',
               }}
             >
-              EI
+              <img
+                src={logo}
+                alt="ExamI"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
             </div>
             <div>
               <h1

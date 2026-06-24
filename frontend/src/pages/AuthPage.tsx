@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { GraduationCap, Bolt } from 'lucide-react';
+import logo from '../assets/exami_monogram_logo.png';
+import { Bolt } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 
@@ -80,16 +81,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 style={{
                   width: '48px',
                   height: '48px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(8px)',
                   borderRadius: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  overflow: 'hidden',
                 }}
               >
-                <GraduationCap size={28} color="#fff" />
+                <img
+                  src={logo}
+                  alt="ExamI"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
               </div>
               <h1
                 style={{
@@ -103,7 +106,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                   letterSpacing: '-0.02em',
                 }}
               >
-                AI Prep
+                ExamI
               </h1>
             </div>
 
@@ -189,59 +192,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                 <span style={{ fontSize: '1.1rem' }}>Detailed Analytics</span>
               </li>
             </ul>
-          </div>
-
-          {/* Testimonial card */}
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 10,
-              marginTop: '48px',
-              padding: '24px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(4px)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-            }}
-          >
-            <p
-              style={{
-                fontSize: '0.95rem',
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontStyle: 'italic',
-                lineHeight: '1.5',
-                marginBottom: '16px',
-              }}
-            >
-              "AI Prep transformed my study sessions. I went from feeling overwhelmed to completely
-              prepared in just two weeks."
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  border: '2px solid rgba(255, 255, 255, 0.2)',
-                  overflow: 'hidden',
-                  background: '#131b2e',
-                }}
-              >
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBb6oMTFoSqHENnynH1Hq9ACeZm9-ZFB1ldzhS2zckkqh3-s3OoDe3s4z9uiBCm39sTjBkfgzkRelTLuazTBZDO_vdbe5sPsg3aPwMsBG9omo4ndHDJXySRfdK8623-Bh1hktxARF0XFZar-6v3fGFx-tZArKA5uMbJPcnDMP9v140MG2N39-xn25WkuVnmQNg4jZ3J-3_6aP0EHotqv-iUjEFLO2BkQHffFG1SBTJXwQy_kqlvD2jBTuvJv7s1WQRGNiaUhPvjvr1L"
-                  alt="Sarah Jenkins"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-              <div>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-                  Sarah Jenkins
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>
-                  Medical Resident
-                </p>
-              </div>
-            </div>
           </div>
         </section>
 
