@@ -2,6 +2,7 @@ import html
 import logging
 import re
 import urllib.parse
+
 import httpx
 
 from app.core.config import settings
@@ -198,9 +199,7 @@ def research_topic(query: str, syllabus: str) -> str:
         return grounded_context
 
     # 2. Fallback to Wikipedia + DuckDuckGo web scraping
-    logger.info(
-        f"Using fallback search (Wikipedia + DDG scraping) for query: '{query}'"
-    )
+    logger.info(f"Using fallback search (Wikipedia + DDG scraping) for query: '{query}'")
     retrieved_blocks = []
 
     wiki_result = search_wikipedia(query)

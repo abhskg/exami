@@ -1,4 +1,4 @@
-# Makefile for AI-Powered Exam Preparation Portal
+# Makefile for ExamI
 
 .PHONY: help db-up db-down db-logs backend-setup backend-db-init backend-dev backend-test frontend-setup frontend-dev frontend-build setup-all dev clean format backend-format frontend-format purge-documents purge-questions purge-tags purge-topics purge-all
 
@@ -24,7 +24,7 @@ endif
 
 help:
 	@echo "======================================================================"
-	@echo "                AI-Powered Exam Preparation Portal                    "
+	@echo "                               ExamI                                  "
 	@echo "======================================================================"
 	@echo "Available commands:"
 	@echo "  make setup-all          - Complete setup (install dev dependencies, env files)"

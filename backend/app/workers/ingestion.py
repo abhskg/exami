@@ -234,8 +234,8 @@ def process_web_search_task(
         queries = queries[:5]
         total_queries = len(queries)
 
-        from app.services.search_service import research_topic
         from app.services.llm_service import synthesize_search_results
+        from app.services.search_service import research_topic
 
         query_data = {}
         for idx, q in enumerate(queries):
@@ -324,4 +324,3 @@ def process_web_search_task(
     finally:
         if not is_external_db:
             db.close()
-

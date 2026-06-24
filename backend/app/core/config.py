@@ -12,7 +12,7 @@ ENV_FILE = BACKEND_DIR / ".env"
 
 class Settings(BaseSettings):
     # App Configuration
-    APP_NAME: str = "AI-Powered Exam Preparation Portal"
+    APP_NAME: str = "ExamI"
     APP_ENV: str = "local"
     DEBUG: bool = True
     LOG_LEVEL: str = "DEBUG"

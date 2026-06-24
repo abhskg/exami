@@ -1,5 +1,5 @@
 # User Flow / Journey Maps
-## AI-Powered Exam Preparation Portal
+## ExamI
 
 ---
 

@@ -1087,7 +1087,7 @@ function App() {
                 fontFamily: 'var(--font-display)',
               }}
             >
-              EP
+              EI
             </div>
             <div>
               <h1
@@ -1100,7 +1100,7 @@ function App() {
                   color: 'var(--text-primary)',
                 }}
               >
-                ExamPrep AI
+                ExamI
               </h1>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 Local-First MVP
@@ -1641,7 +1641,7 @@ function App() {
               }}
             >
               <div style={{ position: 'relative', zIndex: 2 }}>
-                <h1 style={{ marginBottom: '12px' }}>Welcome to ExamPrep AI!</h1>
+                <h1 style={{ marginBottom: '12px' }}>Welcome to ExamI!</h1>
                 <p
                   style={{
                     color: 'var(--text-secondary)',
@@ -2323,9 +2323,10 @@ function App() {
                         marginBottom: '24px',
                       }}
                     >
-                      <strong>Web Search Agent Run:</strong> Clicking submit will automatically launch
-                      web search agents to query Wikipedia and scrape web resources for each target topic.
-                      The agent will synthesize a cohesive study guide for your syllabus.
+                      <strong>Web Search Agent Run:</strong> Clicking submit will automatically
+                      launch web search agents to query Wikipedia and scrape web resources for each
+                      target topic. The agent will synthesize a cohesive study guide for your
+                      syllabus.
                     </div>
 
                     {/* Progress bar during uploads */}

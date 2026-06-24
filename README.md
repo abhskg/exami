@@ -1,4 +1,4 @@
-# 🎓 AI-Powered Exam Preparation Portal — Local-First MVP
+# 🎓 ExamI — Local-First MVP
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![VectorDB](https://img.shields.io/badge/VectorDB-pgvector-blue.svg?style=flat&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
 
-Welcome to the **AI-Powered Exam Preparation Portal**, a local-first MVP designed to provide individuals and small teams with a private, secure, and highly intelligent workspace for automated exam preparation. Powered by the Gemini API and robust local storage, the platform handles complex PDF/text parsing, dynamic multi-choice question (MCQ) generation, auto-tagging of topics, structured exam simulations, and performance analytics.
+Welcome to **ExamI**, a local-first MVP designed to provide individuals and small teams with a private, secure, and highly intelligent workspace for automated exam preparation. Powered by the Gemini API and robust local storage, the platform handles complex PDF/text parsing, dynamic multi-choice question (MCQ) generation, auto-tagging of topics, structured exam simulations, and performance analytics.
 
 ---
 
@@ -98,12 +98,13 @@ You can quickly configure, setup, and run the project using our new developer su
 | **Initialize Schema**  | `make backend-db-init` | `.\run.ps1 backend-db-init`   |
 | **Run Dev Servers**    | `make dev`             | `.\run.ps1 dev`               |
 | **Run Backend Tests**  | `make backend-test`    | `.\run.ps1 backend-test`      |
+| **Format Code**        | `make format`          | `.\run.ps1 format`            |
 | **Clean Build Caches** | `make clean`           | `.\run.ps1 clean`             |
-| **Purge Documents**    | `make purge-documents` | —                             |
-| **Purge Questions**    | `make purge-questions` | —                             |
-| **Purge Tags**         | `make purge-tags`      | —                             |
-| **Purge Topics**       | `make purge-topics`    | —                             |
-| **Purge All Data**     | `make purge-all`       | —                             |
+| **Purge Documents**    | `make purge-documents` | `.\run.ps1 purge-documents`   |
+| **Purge Questions**    | `make purge-questions` | `.\run.ps1 purge-questions`   |
+| **Purge Tags**         | `make purge-tags`      | `.\run.ps1 purge-tags`        |
+| **Purge Topics**       | `make purge-topics`    | `.\run.ps1 purge-topics`      |
+| **Purge All Data**     | `make purge-all`       | `.\run.ps1 purge-all`         |
 
 ---
 

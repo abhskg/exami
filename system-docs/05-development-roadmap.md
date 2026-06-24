@@ -1,6 +1,6 @@
 # Development Roadmap & Implementation Tasks
 
-## AI-Powered Exam Preparation Portal — Local-First MVP
+## ExamI — Local-First MVP
 
 This document maintains the step-by-step roadmap for implementing the Local-First MVP. It defines the specific action items, goals, and dependencies for each phase of the build sequence.
 

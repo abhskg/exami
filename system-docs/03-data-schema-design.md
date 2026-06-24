@@ -1,5 +1,5 @@
 # Data Entity / Schema Design
-## AI-Powered Exam Preparation Portal
+## ExamI
 
 ---
 

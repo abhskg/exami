@@ -1,5 +1,5 @@
 # Component Breakdown
-## AI-Powered Exam Preparation Portal — Local-First MVP
+## ExamI — Local-First MVP
 
 ---
 

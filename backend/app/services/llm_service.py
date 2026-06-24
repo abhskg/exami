@@ -258,7 +258,9 @@ def generate_search_grounding(query: str, syllabus: str) -> Optional[str]:
     or if the call fails / key is missing.
     """
     provider = settings.LLM_PROVIDER.lower().strip()
-    has_gemini_key = settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your-gemini-api-key-here"
+    has_gemini_key = (
+        settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your-gemini-api-key-here"
+    )
 
     if provider != "gemini" or not has_gemini_key or settings.APP_ENV == "test":
         return None
@@ -281,7 +283,7 @@ Format the output strictly as clear, clean Markdown text. Do not return conversa
             contents=prompt,
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
+            ),
         )
         if response.text:
             return response.text.strip()
@@ -333,7 +335,9 @@ Instructions:
 
     if is_mock:
         logger.warning("Using mock synthesis for web search.")
-        topics_list = "\n".join(f"- **{q}**: Explanations and theoretical context for {q}." for q in query_data.keys())
+        topics_list = "\n".join(
+            f"- **{q}**: Explanations and theoretical context for {q}." for q in query_data.keys()
+        )
         return f"""# {title} (Mock Synthesized Guide)
 
 ## Introduction
@@ -350,10 +354,7 @@ This concludes the mock syllabus study guide.
         if provider == "gemini":
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
             model_name = settings.LLM_MODEL or "gemini-3.1-flash-lite"
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt
-            )
+            response = client.models.generate_content(model=model_name, contents=prompt)
             return response.text.strip()
         elif provider in ("openai", "lmstudio"):
             client = get_llm_client()
@@ -366,10 +367,10 @@ This concludes the mock syllabus study guide.
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a professional educational compiler. Output clean markdown content only."
+                        "content": "You are a professional educational compiler. Output clean markdown content only.",
                     },
-                    {"role": "user", "content": prompt}
-                ]
+                    {"role": "user", "content": prompt},
+                ],
             )
             return response.choices[0].message.content.strip()
         else:

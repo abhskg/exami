@@ -1,6 +1,6 @@
-# ⚛️ AI-Powered Exam Preparation Portal — Frontend
+# ⚛️ ExamI — Frontend
 
-This is the client-side user interface for the **AI-Powered Exam Preparation Portal**, built using **React (Vite + TypeScript)** and styled using **Modern Vanilla CSS**. It provides a fully responsive layout with clean glassmorphic components, active states, dynamic progress trackers, and real-time exam simulations.
+This is the client-side user interface for **ExamI**, built using **React (Vite + TypeScript)** and styled using **Modern Vanilla CSS**. It provides a fully responsive layout with clean glassmorphic components, active states, dynamic progress trackers, and real-time exam simulations.
 
 ---
 
@@ -22,16 +22,12 @@ frontend/
 ├── public/           # Static public assets (icons, images)
 ├── src/
 │   ├── components/   # Reusable UI widgets
+│   │   └── KnowledgeCatalog.tsx # Catalog administration dashboard widget
+│   │
+│   ├── pages/        # View pages and gateway components
 │   │   ├── AuthPage.tsx       # Dual-column responsive authentication gateway
 │   │   ├── LoginForm.tsx      # Validation-enabled login component
 │   │   └── SignupForm.tsx     # Registration form with status feedback
-│   │
-│   ├── pages/        # Main application views and tab containers
-│   │   # (Integrated page controllers managed inside App.tsx)
-│   │   # - Dashboard: Summary analytics and topics overview
-│   │   # - Setup Wizard: Topic creation and document ingestion drop-zone
-│   │   # - Exam Simulator: Practice/Timed session interface with active timer
-│   │   # - Results View: Performance heatmaps mapped onto tags
 │   │
 │   ├── hooks/        # Shared custom React hooks for global/local states
 │   ├── services/     # API request communications layer
@@ -104,12 +100,16 @@ Maintained in [App.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-p
 
 ### 2. Authentication Gateway (`AuthPage.tsx`)
 
-A secure split-layout containing the [LoginForm](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/LoginForm.tsx) and [SignupForm](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/SignupForm.tsx). Handles JWT token caching and redirects to the internal app workspace.
+A secure split-layout containing the [LoginForm](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/pages/LoginForm.tsx) and [SignupForm](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/pages/SignupForm.tsx). Handles JWT token caching and redirects to the internal app workspace.
 
 ### 3. Document Ingestion Zone
 
 Allows selecting/creating topics, dragging and dropping files (PDFs, Markdown, text files under the configured limit, default 15MB), and tracking parsing pipelines via a polling job status component.
 
-### 4. Exam Configuration & Simulator (`ExamConfigPanel`)
+### 4. Knowledge Catalog Dashboard (`KnowledgeCatalog.tsx`)
+
+Located at [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx), this sub-view allows administrators to manage ingested Documents, search Content Chunks/Embeddings, edit Questions and options, and manage/merge tags. It includes an integrated visual analytics panel at the top.
+
+### 5. Exam Configuration & Simulator (`ExamConfigPanel`)
 
 Provides topic dropdowns, slider ranges for question count limits, difficulty level toggles (`Easy`, `Medium`, `Hard`, `Mixed`), and tag chips for filtered generations. Launches practice or timed simulations with integrated timers.

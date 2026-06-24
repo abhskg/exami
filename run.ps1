@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Development runner script for the AI-Powered Exam Preparation Portal on Windows.
+    Development runner script for ExamI on Windows.
 .DESCRIPTION
     Provides automated workflows to manage the Docker database, backend, and frontend.
 .EXAMPLE
@@ -10,7 +10,7 @@
 
 param (
     [Parameter(Position = 0)]
-    [ValidateSet("setup", "db-up", "db-down", "db-logs", "backend-setup", "backend-db-init", "backend-dev", "backend-test", "frontend-setup", "frontend-dev", "frontend-build", "dev", "clean", "help")]
+    [ValidateSet("setup", "db-up", "db-down", "db-logs", "backend-setup", "backend-db-init", "backend-dev", "backend-test", "frontend-setup", "frontend-dev", "frontend-build", "dev", "clean", "format", "purge-documents", "purge-questions", "purge-tags", "purge-topics", "purge-all", "help")]
     [string]$Action = "help"
 )
 
@@ -18,7 +18,7 @@ $RootDir = Get-Location
 
 function Show-Help {
     Write-Host "======================================================================" -ForegroundColor Cyan
-    Write-Host "                AI-Powered Exam Preparation Portal                    " -ForegroundColor Cyan
+    Write-Host "                               ExamI                                  " -ForegroundColor Cyan
     Write-Host "                       PowerShell Dev Utility                         " -ForegroundColor Cyan
     Write-Host "======================================================================" -ForegroundColor Cyan
     Write-Host "Available actions:"
@@ -34,6 +34,12 @@ function Show-Help {
     Write-Host "  .\run.ps1 frontend-dev     - Run React Vite dev server" -ForegroundColor Yellow
     Write-Host "  .\run.ps1 frontend-build   - Build frontend production bundles" -ForegroundColor Yellow
     Write-Host "  .\run.ps1 dev              - Launch both backend & frontend in new terminals" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 format           - Format code (black/isort for backend, prettier for frontend)" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 purge-documents  - Purge all documents and clear files on disk" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 purge-questions  - Purge all questions and options" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 purge-tags       - Purge all taxonomy tags" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 purge-topics     - Purge all topics (cascades to all other data)" -ForegroundColor Yellow
+    Write-Host "  .\run.ps1 purge-all        - Purge all data from database and disk files" -ForegroundColor Yellow
     Write-Host "  .\run.ps1 clean            - Clean cache, venv, and node_modules folders" -ForegroundColor Yellow
     Write-Host "======================================================================" -ForegroundColor Cyan
 }
@@ -194,6 +200,73 @@ switch ($Action) {
         }
 
         Write-Host "Clean finished." -ForegroundColor Green
+    }
+
+    "format" {
+        Write-Host "Formatting backend with black and isort..." -ForegroundColor Green
+        cd "$RootDir\backend"
+        if (Test-Path ".venv") {
+            & .venv\Scripts\black .
+            & .venv\Scripts\isort .
+        } else {
+            Write-Warning "Backend virtual environment not found. Skipping backend formatting."
+        }
+
+        Write-Host "Formatting frontend with prettier..." -ForegroundColor Green
+        cd "$RootDir\frontend"
+        npm run format
+
+        Write-Host "Formatting complete!" -ForegroundColor Green
+    }
+
+    "purge-documents" {
+        Write-Host "Purging documents..." -ForegroundColor Yellow
+        cd "$RootDir\backend"
+        if (-not (Test-Path ".venv")) {
+            Write-Error "Virtual environment not found! Run backend-setup action first."
+            exit 1
+        }
+        & .venv\Scripts\python -m app.purge --documents
+    }
+
+    "purge-questions" {
+        Write-Host "Purging questions..." -ForegroundColor Yellow
+        cd "$RootDir\backend"
+        if (-not (Test-Path ".venv")) {
+            Write-Error "Virtual environment not found! Run backend-setup action first."
+            exit 1
+        }
+        & .venv\Scripts\python -m app.purge --questions
+    }
+
+    "purge-tags" {
+        Write-Host "Purging tags..." -ForegroundColor Yellow
+        cd "$RootDir\backend"
+        if (-not (Test-Path ".venv")) {
+            Write-Error "Virtual environment not found! Run backend-setup action first."
+            exit 1
+        }
+        & .venv\Scripts\python -m app.purge --tags
+    }
+
+    "purge-topics" {
+        Write-Host "Purging topics..." -ForegroundColor Yellow
+        cd "$RootDir\backend"
+        if (-not (Test-Path ".venv")) {
+            Write-Error "Virtual environment not found! Run backend-setup action first."
+            exit 1
+        }
+        & .venv\Scripts\python -m app.purge --topics
+    }
+
+    "purge-all" {
+        Write-Host "Purging all data..." -ForegroundColor Yellow
+        cd "$RootDir\backend"
+        if (-not (Test-Path ".venv")) {
+            Write-Error "Virtual environment not found! Run backend-setup action first."
+            exit 1
+        }
+        & .venv\Scripts\python -m app.purge --all
     }
 }
 

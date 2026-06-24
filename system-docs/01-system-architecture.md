@@ -1,11 +1,11 @@
 # System Architecture Document
-## AI-Powered Exam Preparation Portal — Local-First MVP
+## ExamI — Local-First MVP
 
 ---
 
 ## 1. Purpose
 
-This document describes the architecture for a **lean, local-first version** of the AI-Powered Exam Preparation Portal. The goal at this stage is a single small-footprint deployment (one server, or even one laptop) that proves out the core loop — ingest → generate → tag → exam → review — without the operational overhead of a distributed system.
+This document describes the architecture for a **lean, local-first version** of ExamI. The goal at this stage is a single small-footprint deployment (one server, or even one laptop) that proves out the core loop — ingest → generate → tag → exam → review — without the operational overhead of a distributed system.
 
 The original enterprise-scale architecture is not discarded; it's deferred. Section 7 ("Migration Path") shows exactly where this design would split apart if/when scale demands it.
 

@@ -1,6 +1,6 @@
-# 🐍 AI-Powered Exam Preparation Portal — Backend
+# 🐍 ExamI — Backend
 
-This is the backend service for the **AI-Powered Exam Preparation Portal**, built using **FastAPI** (Python 3.10+) and integrated with a **PostgreSQL** database featuring the **pgvector** extension. It handles user authentication, document parsing, semantic text chunking, vector embeddings, Gemini-powered question generation, and simulated exam session states.
+This is the backend service for **ExamI**, built using **FastAPI** (Python 3.10+) and integrated with a **PostgreSQL** database featuring the **pgvector** extension. It handles user authentication, document parsing, semantic text chunking, vector embeddings, Gemini-powered question generation, and simulated exam session states.
 
 ---
 
@@ -9,7 +9,7 @@ This is the backend service for the **AI-Powered Exam Preparation Portal**, buil
 *   **FastAPI**: Modern, high-performance web framework for building APIs.
 *   **SQLAlchemy (v2.0+)**: SQL toolkit and Object Relational Mapper (ORM).
 *   **pgvector**: PostgreSQL vector similarity search extension.
-*   **Google GenAI SDK**: For calling the Gemini models (`text-embedding-004` and `gemini-1.5-flash`).
+*   **Google GenAI SDK**: For calling the Gemini models (`gemini-embedding-001` and `gemini-3.1-flash-lite`).
 *   **Pydantic (v2.0+)**: Data validation and settings management using python type annotations.
 *   **PyPDF**: PDF content extraction.
 *   **Pytest**: Robust test suite execution.
@@ -85,7 +85,7 @@ backend/
 Copy `backend/.env.example` to `backend/.env` and update the variables:
 
 ```ini
-APP_NAME="AI-Powered Exam Preparation Portal"
+APP_NAME="ExamI"
 APP_ENV=local
 DEBUG=True
 
