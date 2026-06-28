@@ -1,7 +1,7 @@
 import uuid
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, ForeignKey, Index, Integer, Text
+from sqlalchemy import Column, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -36,6 +36,7 @@ class ContentChunk(Base):
     # Embedding vector dimension dynamically resolved from config settings
     embedding = Column(Vector(settings.EMBEDDING_DIMENSION), nullable=True)
     chunk_index = Column(Integer, nullable=False)
+    okf_concept_path = Column(String, nullable=True)
 
     # Index for user isolation scoping
     __table_args__ = (Index("idx_content_chunks_user_topic", "user_id", "topic_id"),)

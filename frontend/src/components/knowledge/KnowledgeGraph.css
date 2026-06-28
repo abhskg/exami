@@ -1,0 +1,32 @@
+.node circle {
+  stroke: #fff;
+  stroke-width: 2px;
+  transition: all 0.2s ease;
+}
+
+.node:hover circle {
+  fill: #6366f1;
+  stroke: #4f46e5;
+  stroke-width: 3px;
+}
+
+.node-label {
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 12px;
+  fill: #374151;
+  pointer-events: none;
+}
+
+.link {
+  stroke: #cbd5e1;
+  stroke-opacity: 0.6;
+  stroke-width: 2px;
+}
+
+.links line {
+  stroke: #94a3b8;
+  stroke-opacity: 0.6;
+}

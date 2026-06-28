@@ -234,7 +234,7 @@ def process_web_search_task(
         queries = queries[:5]
         total_queries = len(queries)
 
-        from app.services.llm_service import synthesize_search_results
+        from app.services.okf_service import generate_okf_concepts, validate_okf_concepts
         from app.services.search_service import research_topic
 
         query_data = {}
@@ -250,45 +250,119 @@ def process_web_search_task(
             if text_result:
                 query_data[q] = text_result
 
-        # Synthesize into unified guide
+        # Generate OKF Concepts
         job.progress = 65
-        job.message = "Synthesizing research results into study guide..."
+        job.message = "Structuring research results into OKF concepts..."
         db.commit()
 
-        synthesized_guide = synthesize_search_results(title, syllabus, query_data)
+        concepts = generate_okf_concepts(title, syllabus, query_data)
 
-        # Ensure directory exists and write compiled guide to storage path
+        # Validate OKF Concepts
         job.progress = 75
-        job.message = "Writing compiled document to disk..."
+        job.message = "Validating extracted concepts..."
         db.commit()
 
-        user_upload_dir = os.path.dirname(doc.storage_path)
-        os.makedirs(user_upload_dir, exist_ok=True)
-        with open(doc.storage_path, "w", encoding="utf-8") as f:
-            f.write(synthesized_guide)
+        validated_concepts = validate_okf_concepts(concepts)
 
-        # Segment into chunks
-        job.progress = 80
-        job.message = "Chunking synthesized document..."
-        db.commit()
+        # Write to staging JSON file tied to job_id
+        staging_dir = os.path.join(settings.DATA_DIR, "staging")
+        os.makedirs(staging_dir, exist_ok=True)
+        staging_path = os.path.join(staging_dir, f"{job_id}.json")
 
-        chunks = chunk_text(synthesized_guide)
-        if not chunks:
-            raise ValueError("Synthesized document yielded zero text chunks.")
+        import json
 
-        # Generate embeddings
+        with open(staging_path, "w", encoding="utf-8") as f:
+            json.dump(validated_concepts, f, indent=2)
+
+        # Set job state to awaiting_review
+        job.status = "awaiting_review"
         job.progress = 85
-        job.message = "Generating vector embeddings..."
+        job.message = "Awaiting user review of extracted concepts."
+        db.commit()
+        logger.info(f"Staged {len(validated_concepts)} OKF concepts for review (job {job_id}).")
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Exception encountered during web search processing (job {job_id}): {e}")
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if job:
+                job.status = "failed"
+                job.message = str(e)
+                job.progress = 100
+            if doc:
+                doc.status = "failed"
+            db.commit()
+        except Exception as db_err:
+            logger.error(f"Failed to write error state to database: {db_err}")
+    finally:
+        if not is_external_db:
+            db.close()
+
+
+def finalize_web_search_task(
+    job_id: uuid.UUID,
+    document_id: uuid.UUID,
+    user_id: uuid.UUID,
+    approved_concepts: list[dict],
+    db=None,
+) -> None:
+    """
+    Background worker job to finalize OKF concepts after user review:
+    1. Writes approved OKF concept files to disk.
+    2. Chunks text from the OKF semantic boundaries.
+    3. Generates embeddings and writes to pgvector.
+    """
+    is_external_db = db is not None
+    if not is_external_db:
+        db = SessionLocal()
+
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        doc = db.query(Document).filter(Document.id == document_id).first()
+
+        if not job or not doc:
+            logger.error(f"Job {job_id} or Document {document_id} not found in DB.")
+            return
+
+        job.status = "running"
+        job.progress = 85
+        job.message = "Writing OKF concepts to disk..."
         db.commit()
 
-        embeddings = get_embeddings(chunks)
+        from app.services.okf_service import chunk_from_okf, write_okf_concepts
 
-        # Save chunks and vectors
+        okf_dir = os.path.join(settings.DATA_DIR, "knowledge", str(user_id), str(doc.topic_id))
+        doc.okf_directory_path = okf_dir
+        db.commit()
+
+        write_okf_concepts(user_id, doc.topic_id, approved_concepts, okf_dir)
+
+        job.progress = 90
+        job.message = "Chunking semantic concepts..."
+        db.commit()
+
+        # Gather saved file paths
+        concept_files = [
+            os.path.join(okf_dir, "concepts", f"{c['slug']}.md") for c in approved_concepts
+        ]
+        chunks_data = chunk_from_okf(concept_files)
+
+        if not chunks_data:
+            raise ValueError("OKF processing yielded zero text chunks.")
+
         job.progress = 95
-        job.message = "Saving segments to database..."
+        job.message = "Generating embeddings..."
         db.commit()
 
-        for idx, (chunk_text_content, emb_vector) in enumerate(zip(chunks, embeddings)):
+        texts = [text for _, text in chunks_data]
+        embeddings = get_embeddings(texts)
+
+        for idx, ((filepath, chunk_text_content), emb_vector) in enumerate(
+            zip(chunks_data, embeddings)
+        ):
+            relative_path = os.path.relpath(filepath, okf_dir)
             chunk = ContentChunk(
                 document_id=doc.id,
                 user_id=user_id,
@@ -296,19 +370,24 @@ def process_web_search_task(
                 chunk_text=chunk_text_content,
                 embedding=emb_vector,
                 chunk_index=idx,
+                okf_concept_path=relative_path,
             )
             db.add(chunk)
 
         doc.status = "parsed"
         job.status = "completed"
         job.progress = 100
-        job.message = "Completed compiling and vectorizing."
+        job.message = "Completed OKF structuring and vectorizing."
         db.commit()
-        logger.info(f"Successfully processed web search document {document_id} (job {job_id}).")
+
+        # Cleanup staging file
+        staging_path = os.path.join(settings.DATA_DIR, "staging", f"{job_id}.json")
+        if os.path.exists(staging_path):
+            os.remove(staging_path)
 
     except Exception as e:
         db.rollback()
-        logger.exception(f"Exception encountered during web search processing (job {job_id}): {e}")
+        logger.exception(f"Exception encountered during finalization (job {job_id}): {e}")
         try:
             job = db.query(Job).filter(Job.id == job_id).first()
             doc = db.query(Document).filter(Document.id == document_id).first()

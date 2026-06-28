@@ -37,6 +37,7 @@ class Document(Base):
     status = Column(
         String, default="pending", nullable=False
     )  # e.g., 'pending', 'parsing', 'parsed', 'failed'
+    okf_directory_path = Column(String, nullable=True)
     ingested_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Composite Index for isolation-safe queries

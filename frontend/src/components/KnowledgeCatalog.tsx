@@ -13,7 +13,10 @@ import {
   Filter,
   Save,
   Sparkles,
+  Share2,
 } from 'lucide-react';
+
+import { KnowledgeGraph } from './knowledge/KnowledgeGraph';
 
 interface Topic {
   id: string;
@@ -102,7 +105,9 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
   showToast,
   onDocumentsChange,
 }) => {
-  const [subTab, setSubTab] = useState<'documents' | 'questions' | 'tags'>('documents');
+  const [subTab, setSubTab] = useState<'documents' | 'questions' | 'tags' | 'knowledge_graph'>(
+    'documents'
+  );
 
   // --- Documents state ---
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -618,9 +623,35 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
           <TagIcon size={18} />
           <span>Topic Tags</span>
         </button>
+        <button
+          onClick={() => setSubTab('knowledge_graph')}
+          style={{
+            padding: '12px 18px',
+            background: 'none',
+            border: 'none',
+            color: subTab === 'knowledge_graph' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            fontWeight: subTab === 'knowledge_graph' ? 700 : 400,
+            cursor: 'pointer',
+            borderBottom:
+              subTab === 'knowledge_graph'
+                ? '2px solid var(--accent-primary)'
+                : '2px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Share2 size={18} />
+          <span>Knowledge Graph</span>
+        </button>
       </div>
 
       {/* SUB-VIEW 1: Documents & Embeddings */}
+      {subTab === 'knowledge_graph' && (
+        <KnowledgeGraph apiUrl={apiUrl} token={token} topicId={selectedTopic.id} />
+      )}
+
       {subTab === 'documents' && (
         <div
           style={{

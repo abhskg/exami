@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { AuthPage } from './pages/AuthPage';
 import { KnowledgeCatalog } from './components/KnowledgeCatalog';
+import { ReviewPanel } from './components/knowledge/ReviewPanel';
 
 interface Topic {
   id: string;
@@ -86,6 +87,7 @@ function App() {
   // Upload & Jobs state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string>('');
   const [jobMessage, setJobMessage] = useState<string>('');
@@ -410,6 +412,7 @@ function App() {
       if (res.status === 202) {
         // Ingestion started successfully, start polling job
         const jobId = data.job_id;
+        setCurrentJobId(jobId);
         showToast('Ingestion job started. Processing in background...', 'info');
         pollJobStatus(jobId);
       } else {
@@ -449,6 +452,7 @@ function App() {
       const data = await res.json();
       if (res.status === 202) {
         const jobId = data.job_id;
+        setCurrentJobId(jobId);
         showToast('Raw text ingestion started. Processing in background...', 'info');
         setRawTextTitle('');
         setRawTextContent('');
@@ -498,6 +502,7 @@ function App() {
       const data = await res.json();
       if (res.status === 202) {
         const jobId = data.job_id;
+        setCurrentJobId(jobId);
         showToast('Simulated web parser run started. Processing in background...', 'info');
         setWebSearchTitle('');
         setWebSearchSyllabus('');
@@ -542,6 +547,8 @@ function App() {
             setJobMessage(job.message || 'Processing failed.');
             showToast(job.message || 'Document processing failed.', 'error');
             fetchDocuments(selectedTopic!.id);
+          } else if (job.status === 'awaiting_review') {
+            clearInterval(pollIntervalRef.current);
           } else {
             // Update message based on progress
             if (job.progress < 30) setJobMessage('Parsing document structures...');
@@ -1041,6 +1048,37 @@ function App() {
                 Delete Everything
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Review Panel Modal */}
+      {jobStatus === 'awaiting_review' && currentJobId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 3000,
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh' }}>
+            <ReviewPanel
+              apiUrl={apiUrl}
+              token={token}
+              jobId={currentJobId}
+              topicId={selectedTopic!.id}
+              documentId={documents[0]?.id || ''} // In MVP, assume first document or handle properly
+              onComplete={() => {
+                setJobStatus('running');
+                pollJobStatus(currentJobId);
+              }}
+            />
           </div>
         </div>
       )}

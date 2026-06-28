@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     EMBEDDING_BASE_URL: str = ""
 
     # Storage Settings
+    DATA_DIR: str = "./data"
     UPLOADS_DIR: str = "./data/uploads"
     MAX_FILE_SIZE_MB: int = 15
 
