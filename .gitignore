@@ -36,6 +36,7 @@ ui-design/
 *.key
 
 # IDEs and Editors
+.walkthrough/
 .vscode/
 .idea/
 *.suo
