@@ -403,3 +403,70 @@ def finalize_web_search_task(
     finally:
         if not is_external_db:
             db.close()
+
+
+def update_concept_embeddings_task(
+    document_id: uuid.UUID,
+    topic_id: uuid.UUID,
+    user_id: uuid.UUID,
+    okf_dir: str,
+    slug: str,
+    db: SessionLocal = None,
+):
+    """
+    Background worker task to re-vectorize a single OKF concept after it has been expanded or modified.
+    Drops old chunks for this specific concept file and generates new ones.
+    """
+    is_external_db = db is not None
+    if not is_external_db:
+        db = SessionLocal()
+
+    try:
+        from app.services.okf_service import chunk_from_okf
+
+        okf_concept_path = f"concepts/{slug}.md"
+        
+        # Drop existing chunks for this file
+        db.query(ContentChunk).filter(
+            ContentChunk.document_id == document_id,
+            ContentChunk.okf_concept_path == okf_concept_path
+        ).delete()
+        db.commit()
+
+        # Re-chunk the modified file
+        concept_file_path = os.path.join(okf_dir, "concepts", f"{slug}.md")
+        chunks_data = chunk_from_okf([concept_file_path])
+
+        if not chunks_data:
+            logger.warning(f"No text chunks found for expanded concept {slug}")
+            return
+
+        texts = [text for _, text in chunks_data]
+        embeddings = get_embeddings(texts)
+
+        # Insert new chunks
+        new_chunks = []
+        for i, (path, text) in enumerate(chunks_data):
+            # path is the absolute path, we store relative "concepts/slug.md"
+            new_chunks.append(
+                ContentChunk(
+                    document_id=document_id,
+                    user_id=user_id,
+                    topic_id=topic_id,
+                    chunk_text=text,
+                    embedding=embeddings[i] if embeddings else None,
+                    chunk_index=i,
+                    okf_concept_path=okf_concept_path,
+                )
+            )
+
+        db.bulk_save_objects(new_chunks)
+        db.commit()
+        logger.info(f"Successfully re-embedded {len(new_chunks)} chunks for {slug}")
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Failed to update embeddings for concept {slug}: {e}")
+    finally:
+        if not is_external_db:
+            db.close()

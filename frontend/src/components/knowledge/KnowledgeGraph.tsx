@@ -98,9 +98,20 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       )
       .force('charge', d3.forceManyBody().strength(-300))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide().radius(40));
+      .force('collide', d3.forceCollide().radius(50));
 
-    const link = svg
+    // Create a main group for zoom
+    const g = svg.append('g').attr('class', 'main-group');
+
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform);
+      });
+
+    svg.call(zoom);
+
+    const link = g
       .append('g')
       .attr('class', 'links')
       .selectAll('line')
@@ -108,9 +119,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       .enter()
       .append('line')
       .attr('class', 'link')
+      .attr('stroke', 'rgba(255,255,255,0.2)')
+      .attr('stroke-width', 1.5)
       .attr('marker-end', 'url(#arrowhead)');
 
-    const node = svg
+    const node = g
       .append('g')
       .attr('class', 'nodes')
       .selectAll('g')
@@ -127,13 +140,22 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       )
       .on('click', (event, d) => setSelectedNode(d));
 
-    node.append('circle').attr('r', 15).attr('fill', '#4f46e5');
+    node.append('circle')
+        .attr('r', 18)
+        .attr('fill', 'var(--accent-primary)')
+        .attr('stroke', 'var(--accent-secondary)')
+        .attr('stroke-width', 2)
+        .style('filter', 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))');
 
     node
       .append('text')
-      .attr('dy', 25)
+      .attr('dy', 32)
       .attr('text-anchor', 'middle')
       .text(d => d.title)
+      .attr('fill', 'var(--text-primary)')
+      .style('font-size', '12px')
+      .style('font-weight', '500')
+      .style('pointer-events', 'none')
       .attr('class', 'node-label');
 
     simulation.on('tick', () => {
@@ -169,30 +191,38 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       d.fy = null;
     }
 
+    // Add explicit zoom controls
+    d3.select(containerRef.current).select('.zoom-controls').remove();
+    const controls = d3.select(containerRef.current).append('div').attr('class', 'zoom-controls').style('position', 'absolute').style('bottom', '20px').style('right', '20px').style('display', 'flex').style('gap', '8px');
+    
+    controls.append('button').text('+').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.scaleBy, 1.3));
+    controls.append('button').text('-').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.scaleBy, 0.7));
+    controls.append('button').text('⟲').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.transform, d3.zoomIdentity));
+
     return () => {
       simulation.stop();
     };
   }, [nodes, links]);
 
   if (isLoading) {
-    return <div className="p-8 text-center text-gray-500">Loading knowledge graph...</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading knowledge graph...</div>;
   }
 
   if (error) {
-    return <div className="p-8 text-center text-gray-500">{error}</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: '#ef4444' }}>{error}</div>;
   }
 
   return (
-    <div className="flex h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-      <div className="flex-1 relative" ref={containerRef}>
-        <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
-        <div className="absolute top-4 left-4 bg-white p-3 rounded shadow text-sm border border-gray-100">
-          <h3 className="font-semibold text-gray-700 mb-1">Knowledge Graph</h3>
-          <p className="text-gray-500 text-xs">Drag nodes to explore. Click to read.</p>
+    <div className="glass-card" style={{ display: 'flex', height: '600px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'var(--bg-primary)' }}>
+      <div style={{ flex: 1, position: 'relative' }} ref={containerRef}>
+        <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: 'grab', display: 'block' }} />
+        <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(19, 27, 46, 0.8)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backdropFilter: 'blur(8px)' }}>
+          <h3 style={{ fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: '4px' }}>Knowledge Graph</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>Scroll or pinch to zoom. Drag nodes to explore. Click to read.</p>
         </div>
       </div>
       {selectedNode && (
-        <div className="w-96 border-l border-gray-200 bg-white">
+        <div style={{ width: '400px', borderLeft: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
           <ConceptDetailPanel
             apiUrl={apiUrl}
             token={token}

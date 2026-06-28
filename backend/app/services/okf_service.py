@@ -121,6 +121,51 @@ def _generate_json_with_llm(
                 logger.error(f"Failed to generate JSON from LLM: {e}")
                 raise e
 
+def _generate_text_with_llm(
+    prompt: str, is_mock: bool = False, mock_response: str = None
+) -> str:
+    """Helper to generate raw text (markdown) from LLM."""
+    if is_mock:
+        return mock_response or "Mock markdown content."
+
+    provider = settings.LLM_PROVIDER.lower().strip()
+    max_retries = 3
+
+    for attempt in range(max_retries):
+        try:
+            if provider == "gemini":
+                client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                model_name = settings.LLM_MODEL or "gemini-3.1-flash-lite"
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                return response.text.strip()
+            elif provider in ("openai", "lmstudio"):
+                client = get_llm_client()
+                model_name = settings.LLM_MODEL
+                if not model_name:
+                    model_name = "gpt-4o-mini" if provider == "openai" else "local-model"
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a helpful knowledge assistant.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                return response.choices[0].message.content.strip()
+            else:
+                raise ValueError(f"Unsupported LLM provider: {provider}")
+
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to generate text from LLM: {e}")
+                raise e
+
 
 def generate_okf_concepts(title: str, syllabus: str, query_data: dict[str, str]) -> list[dict]:
     """
@@ -355,12 +400,59 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
     return {"nodes": nodes, "edges": edges}
 
 
-def expand_okf_concept(concept_path: str, new_raw_data: str, mode: str):
+def expand_okf_concept(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str, slug: str, new_raw_data: str) -> str:
     """
-    Merge or append to an existing concept file (deep-dive).
+    Merge or append to an existing concept file (deep-dive) using an LLM to rewrite the body seamlessly.
     """
-    # Implementation pending
-    pass
+    is_mock = settings.APP_ENV == "test"
+    filepath = Path(okf_dir) / "concepts" / f"{slug}.md"
+    
+    if not filepath.exists():
+        raise ValueError(f"Concept {slug} not found.")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Split frontmatter
+    parts = content.split("---")
+    if len(parts) >= 3:
+        frontmatter = "---" + parts[1] + "---"
+        body = "---".join(parts[2:]).strip()
+    else:
+        frontmatter = ""
+        body = content.strip()
+
+    prompt = f"""You are an expert knowledge engineer. Your task is to update and expand an existing educational concept markdown document with new information.
+
+Existing Concept Body:
+{body}
+
+New Information to Weave In:
+{new_raw_data}
+
+Instructions:
+1. Seamlessly integrate the new information into the existing body.
+2. Expand upon the concepts, add new sections if necessary using Markdown (##).
+3. Do NOT output any YAML frontmatter or title headers (# Title).
+4. Output ONLY the updated markdown body. Ensure high educational quality.
+"""
+
+    updated_body = _generate_text_with_llm(prompt, is_mock=is_mock, mock_response=body + f"\n\n## Added Information\n{new_raw_data}")
+
+    # Remove codeblock wrappers if the model wrapped it in markdown tags
+    if updated_body.startswith("```markdown"):
+        updated_body = updated_body.removeprefix("```markdown").removesuffix("```").strip()
+    elif updated_body.startswith("```"):
+        updated_body = updated_body.removeprefix("```").removesuffix("```").strip()
+
+    # Overwrite file
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(frontmatter + "\n" + updated_body + "\n")
+
+    # Log the update
+    append_okf_log(user_id, topic_id, f"Manually deepened concept: {slug}", okf_dir)
+
+    return updated_body
 
 
 def append_okf_log(user_id: uuid.UUID, topic_id: uuid.UUID, event: str, okf_dir: str):

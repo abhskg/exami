@@ -101,6 +101,7 @@ def deepen_concept(
     topic_id: uuid.UUID,
     slug: str,
     request: DeepenRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -117,6 +118,17 @@ def deepen_concept(
         updated_content = expand_okf_concept(
             current_user.id, topic_id, doc.okf_directory_path, slug, request.new_raw_data
         )
+
+        from app.workers.ingestion import update_concept_embeddings_task
+        background_tasks.add_task(
+            update_concept_embeddings_task,
+            doc.id,
+            topic_id,
+            current_user.id,
+            doc.okf_directory_path,
+            slug,
+        )
+
         return {
             "status": "success",
             "message": "Concept expanded",
