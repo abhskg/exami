@@ -15,6 +15,11 @@ Welcome to **ExamI**, a local-first MVP designed to provide individuals and smal
 - **🔒 Complete Workspace Isolation**: User data is isolated at the API and database levels by `user_id` to guarantee secure workspaces.
 - **🗂️ Full Topic Management**: Create, rename, and delete study topics directly from the sidebar. Deleting a topic cascades to remove all its documents, embeddings, questions, exam sessions, and tags in a single atomic operation. Rename uses an inline editor; delete triggers a confirmation modal to prevent accidental data loss.
 - **📚 Fluid Knowledge Growth**: Ingest documents using three methods (File Upload, Raw Text Paste, and Web Search Agent simulation) to expand your knowledge base. Incoming content additive-merges into the existing relational model without overwriting older questions or tags.
+- **🗃️ Open Knowledge Format (OKF) Ingestion**: Restructures document uploads and web crawls into a standardized OKF directory format (containing structured `index.md`, `log.md`, and dynamic concept clusters under `concepts/`) to enable graph-based semantic exploration.
+- **🕸️ Interactive D3 Knowledge Graph**: Visualizes topic-specific knowledge bases as force-directed, zoomable, and interactive networks of concepts, complete with node details and connection graphs.
+- **🔍 Staged Concept Review**: Provides a dedicated pipeline to review, refine, edit, and approve/reject generated concepts before final database vector serialization.
+- **🚀 "Go Deeper" Concept Expansion**: Enables users to enrich existing knowledge nodes dynamically via targeted LLM queries, spawning sub-concepts and triggering automatic background re-vectorization.
+- **🔄 Reparse & Ingestion Retry**: Resiliently handles processing failures, persisting query and search metadata configurations on disk for automated retries.
 - **🧠 Intelligent Chunking & Embedding**: Extract text from files, raw text, or web scraping agent corpuses, parse into manageable segments, generate semantic vectors via the configured embedding provider (e.g. Gemini `gemini-embedding-001`), and store them using `pgvector`.
 - **📝 Dynamic Structured Question Bank**: Automatically generate a customizable number of structured multiple-choice questions matching custom difficulties (`Easy`, `Medium`, `Hard`, `Mixed`) and tag them with concepts using the configured LLM API (e.g. Gemini `gemini-3.1-flash-lite`).
 
@@ -46,11 +51,11 @@ Welcome to **ExamI**, a local-first MVP designed to provide individuals and smal
 ai-exam-portal/
 ├── backend/                  # Python FastAPI Application
 │   ├── app/                  # Main application source code
-│   │   ├── api/              # API router endpoints (auth, questions, exams, ingestion)
+│   │   ├── api/              # API router endpoints (auth, questions, exams, ingestion, knowledge)
 │   │   ├── core/             # Configuration, security, database engines
 │   │   ├── models/           # SQLAlchemy schemas (users, topics, tags, questions, etc.)
 │   │   ├── schemas/          # Pydantic schemas for validation & serialization
-│   │   ├── services/         # Business logic (Vector Query, MCQ Ingestion, Exam Engine)
+│   │   ├── services/         # Business logic (Vector Query, MCQ Ingestion, Exam Engine, OKF)
 │   │   ├── workers/          # In-process background task runners
 │   │   └── main.py           # Application entry point & FastAPI setup
 │   ├── requirements.txt      # Python dependencies
@@ -60,6 +65,7 @@ ai-exam-portal/
 ├── frontend/                 # React Frontend Client (Vite + TS)
 │   ├── src/
 │   │   ├── components/       # Reusable modular UI widgets
+│   │   │   └── knowledge/    # D3 Knowledge Graph, Concept Detail, and Staged Review Panels [NEW]
 │   │   ├── pages/            # View pages (Login, Setup, Exam, Results)
 │   │   ├── hooks/            # Shared custom React hooks
 │   │   ├── services/         # API HTTP communication layer
@@ -71,7 +77,9 @@ ai-exam-portal/
 │   └── vite.config.ts        # Vite configuration script
 │
 ├── data/                     # Local filesystem storage (Git ignored)
-│   └── uploads/              # Raw files (PDFs, text) stored by user_id
+│   ├── uploads/              # Raw files (PDFs, text) stored by user_id
+│   ├── knowledge/            # OKF markdown concept files, indexes, and logs [NEW]
+│   └── staging/              # Staged OKF concepts awaiting review [NEW]
 │
 ├── system-docs/              # System architecture, data schemas, and UI flows
 ├── .editorconfig             # Editor format configurations [NEW]
@@ -169,6 +177,67 @@ docker compose up -d
     ```bash
     npm run dev
     ```
+
+---
+
+## 📖 Usage Guide
+
+Follow this step-by-step guide to get the most out of ExamI's local-first knowledge cataloging and simulator capabilities:
+
+### 1. Create a Study Topic
+- Launch the application and register/log in.
+- In the left sidebar, click the **Create Topic** input field, type a topic name (e.g., "Software Engineering"), and press Enter.
+- *Tip*: You can rename topics inline by hovering and clicking the ✏️ icon, or delete topics by clicking the 🗑️ icon.
+
+### 2. Ingest Reference Documents & Web Search Corpuses
+Choose one of three ingestion workflows to expand your knowledge base under the active topic:
+- **File Ingestion**: Drag & drop or browse for TXT, MD, or PDF documents (up to 15MB) and upload them.
+- **Raw Text Paste**: Paste raw notes, course descriptions, or chapters directly into the text editor.
+- **Web Search Ingestion**: Feed a syllabus and search topics into the intelligent Web Scraping agent. The agent scrapes matching search targets up to **30k characters** of relevant corpus context.
+  
+  *Recommended Syllabus & Topics Generator Prompt*: Use the prompt below with your favorite LLM to format the syllabus and topics list for the web search inputs:
+  ```text
+  Act as an expert curriculum designer and exam specialist. I am drafting a multiple-choice question (MCQ) exam and need a structured syllabus layout. 
+
+  For the exam/subject specified below, please generate two distinct, comma-separated lists. 
+
+  Exam: [Insert Exam Name/Subject Here]
+
+  Please provide the output exactly in the following format:
+
+  Syllabus: <Provide a comma-separated list of the main, high-level modules or chapters for this exam>
+
+  List of Topics to follow upon with detailed drilled down: <Provide a comprehensive, comma-separated list of the specific sub-topics, concepts, and key terms nested under those main modules that are critical for an MCQ-style test>
+  ```
+
+### 3. Review Staged Concepts
+For web search ingestion and structured syllabus flows:
+- The system stages extracted concepts in a **Review Panel** instead of immediately committing them.
+- Review the concept names, summaries, and hierarchies. Approve, reject, or modify concepts inline.
+- Click **Save Approved Concepts** to compile them into Open Knowledge Format (OKF) files, chunk them along semantic boundaries, generate embeddings, and save them in the vector database.
+
+### 4. Explore the Interactive D3 Knowledge Graph
+- Switch to the **Knowledge Catalog** tab in the main view.
+- Open the **Knowledge Graph** sub-tab to visualize your concepts as a D3 force-directed network.
+- Click on any concept node to pull up the **Concept Detail Panel** showing the full markdown content.
+- To expand any node, write a query or paste text in the **"Go Deeper"** text box at the bottom of the details pane. The system will automatically update the concept content and trigger background tasks to re-vectorize the text chunks.
+
+### 5. Generate and Customize MCQ Practice Exams
+- Navigate to the **Exam Simulator** tab.
+- Set up a customized question pool:
+  - Select your target study topic.
+  - Choose a target question count (1 to 30 MCQs).
+  - Select a difficulty level (`Easy`, `Medium`, `Hard`, or `Mixed`).
+  - Optionally select specific concept tags/chips to filter the source chunks.
+- Click **Generate Questions** to query pgvector and synthesize structured MCQs with detailed explanations.
+
+### 6. Take Mock Examinations
+Choose between two simulation formats to test your knowledge:
+- **Practice Mode**: Enables immediate feedback. As soon as you select an answer, the simulator displays a detailed, sentence-highlighted breakdown of:
+  - Correct choice rationale.
+  - Distractor/misconception analysis for incorrect choices.
+  - Real-world analogies or code examples.
+- **Timed Mode**: Replicates realistic test environments. Enforces strict countdown timers, locks responses upon selection, and displays complete scorecards, statistics, and reviews only after the test has been submitted.
 
 ---
 

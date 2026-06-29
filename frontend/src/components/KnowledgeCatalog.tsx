@@ -577,6 +577,28 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
     c.chunk_text.toLowerCase().includes(chunkSearch.toLowerCase())
   );
 
+  if (!selectedTopic) {
+    return (
+      <div
+        className="glass-card fade-in"
+        style={{
+          textAlign: 'center',
+          padding: '60px 40px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+        }}
+      >
+        <BookOpen size={48} color="var(--text-secondary)" style={{ opacity: 0.6 }} />
+        <h3 style={{ margin: 0, fontSize: '1.25rem' }}>No Subject Selected</h3>
+        <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>
+          Please select a subject from the sidebar to view and manage its knowledge catalog.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       {/* Sub-tabs header */}

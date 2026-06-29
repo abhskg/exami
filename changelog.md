@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OKF Ingestion Pipeline Integration**: Restructured the ingestion pipeline to support the Open Knowledge Format (OKF) standard. Ingested data is parsed into dynamic hierarchical concepts and parent-child links rather than flat summaries, and saved under a standardized structure (`index.md`, `log.md`, and clusters under `concepts/`) in the `./data/knowledge/{user_id}/{topic_id}/` workspace folder.
+- **Interactive D3 Knowledge Graph**: Implemented an interactive D3.js-based force-directed Knowledge Graph visualization (`KnowledgeGraph.tsx`) in the frontend, complete with drag/drop, zoom/pan controls, dynamic link safety checks, and interactive node selection.
+- **Staged Concept Review Workflow**: Added a staged concept review interface (`ReviewPanel.tsx` in the frontend) allowing users to approve, reject, or edit generated OKF concepts before finalizing the data load and performing text vectorization.
+- **Dynamic Concept Expansion ("Go Deeper")**: Integrated a "Go Deeper" concept enrichment service (`expand_okf_concept` in backend and `ConceptDetailPanel.tsx` in frontend) enabling users to expand existing concept nodes with detailed LLM queries and automatically trigger background re-vectorization tasks (`update_concept_embeddings_task`).
+- **Ingestion Reparse & Retry Support**: Implemented a retry and reparse endpoint (`POST /api/documents/{document_id}/reparse`) for failed document ingestion and web scans. Persists raw query and syllabus input parameters as metadata configuration on disk to allow exact web search retries, and exposed a retry action button (🔄) next to failed items in the Knowledge Catalog.
+- **Increased System Limits & Optimized Prompts**:
+  - Expanded maximum allowed character length for input syllabus and topic parameters from 1,000 to **100k characters** in API schemas and test suites.
+  - Increased query source context slice limits and web scraping character caps from 10k to **30k characters** for more detailed retrieval.
+  - Optimized LLM generation instructions to require extensive, fully elaborated OKF concept bodies.
 - **MCQ Option Randomization**: Implemented option shuffling in `generate_questions()` using Python's `random.shuffle` before saving options. Shuffled options are mapped to `option_order` sequentially, guaranteeing correct option randomization.
 - **SQLAlchemy Options Ordering**: Configured `Question.options` relationship in `backend/app/models/question.py` with `order_by="QuestionOption.option_order"` to automatically fetch options sorted by `option_order` across all backend API models and serializations.
 - **Question Bank Analytics Dashboard**: Integrated a comprehensive, highly aesthetic analytics panel at the top of the Questions Bank view.
@@ -31,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Knowledge Catalog Dashboard**: Integrated a new sidebar tab and [KnowledgeCatalog.tsx](file:///c:/Users/abhas/My%20Workspace/projects/ai-exam-portal/frontend/src/components/KnowledgeCatalog.tsx) client sub-view for comprehensive catalog administration (Documents, Embeddings/Chunks, Questions, and Tags).
 
 ### Fixed
+- **Dangling Graph Links and Edge Sanitization**: Resolved D3 force simulation layout crashes by filtering out invalid or dangling parent-child edges in the frontend, and added backend sanitization of relationships in `load_okf_index` (supported by comprehensive unit tests).
+- **Staging and OKF Directory Purges**: Consolidated filesystem cleanups by introducing a `_clear_dir` helper in `purge.py` to ensure all staging and OKF-specific directory trees are fully deleted when topics or documents are deleted.
+- **Pathing and Recursive Globbing**: Resolved pathing issues under clustered subdirectories by replacing static file fetches with recursive `rglob` checks in `finalize_web_search_task` and concept endpoints.
 - **Question Generation Failures (>10 Qs)**: Sliced question generation requests into batches of at most 5 questions in `backend/app/services/question_bank.py` to prevent API rate limits, response token exhaustion, timeouts, and JSON decode failures. Implemented resilient try-except block parsing per-question to avoid single-question failures from crashing the entire generation request.
 - **Practice Mode Test Alignment**: Updated practice mode session assertion in `backend/app/tests/test_exams.py` to align with the recently introduced practice mode explanation feature, resolving a test suite failure.
 - **Dropdown Option Menu Theming**: Fixed the dropdown select element glitch where options had white font on white background in Chromium browsers. Added `color-scheme: dark;` to `:root` and explicit styling on `select option` to use `var(--bg-secondary)` as the background and `var(--text-primary)` as the text color.

@@ -148,7 +148,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
           .on('drag', dragged)
           .on('end', dragended)
       )
-      .on('click', (event, d) => setSelectedNode(d));
+      .on('click', (_event, d) => setSelectedNode(d));
 
     node
       .append('circle')
