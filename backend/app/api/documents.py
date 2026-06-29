@@ -179,8 +179,8 @@ class RawTextIngestRequest(BaseModel):
 class WebSearchIngestRequest(BaseModel):
     topic_id: UUID
     title: str = Field(..., max_length=255)
-    syllabus: str = Field(..., max_length=1000)
-    topics: str = Field(..., max_length=1000)
+    syllabus: str = Field(..., max_length=100000)
+    topics: str = Field(..., max_length=100000)
 
 
 @router.post("/raw-text", status_code=status.HTTP_202_ACCEPTED)

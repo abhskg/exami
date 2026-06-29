@@ -300,3 +300,20 @@ def test_web_search_ingestion(client, db):
     if os.path.exists(doc_in_db.storage_path):
         os.remove(doc_in_db.storage_path)
 
+
+def test_web_search_ingest_request_relaxed_limits():
+    from app.api.documents import WebSearchIngestRequest
+    import uuid
+    # Generate a syllabus of 95,000 characters
+    large_syllabus = "a" * 95000
+    large_topics = "b" * 95000
+    req = WebSearchIngestRequest(
+        topic_id=uuid.uuid4(),
+        title="Large Input Ingest",
+        syllabus=large_syllabus,
+        topics=large_topics
+    )
+    assert req.syllabus == large_syllabus
+    assert req.topics == large_topics
+
+
