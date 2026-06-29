@@ -37,6 +37,7 @@ ui-design/
 
 # IDEs and Editors
 .walkthrough/
+.superpowers/
 .vscode/
 .idea/
 *.suo

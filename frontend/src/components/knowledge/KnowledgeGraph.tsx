@@ -88,12 +88,20 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       .attr('fill', '#999')
       .style('stroke', 'none');
 
+    // Filter out invalid/dangling links to prevent D3 forceLink runtime exceptions
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validLinks = links.filter(l => {
+      const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+      const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+      return nodeIds.has(sourceId) && nodeIds.has(targetId);
+    });
+
     const simulation = d3
       .forceSimulation<ConceptNode>(nodes)
       .force(
         'link',
         d3
-          .forceLink<ConceptNode, ConceptEdge>(links)
+          .forceLink<ConceptNode, ConceptEdge>(validLinks)
           .id(d => d.id)
           .distance(100)
       )
@@ -117,7 +125,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       .append('g')
       .attr('class', 'links')
       .selectAll('line')
-      .data(links)
+      .data(validLinks)
       .enter()
       .append('line')
       .attr('class', 'link')

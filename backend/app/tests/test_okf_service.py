@@ -109,3 +109,100 @@ Content of section 2.
     assert chunks[0][1] == "# Test\n\nIntro text here."
     assert chunks[1][1] == "## Section 1\nContent of section 1."
     assert chunks[2][1] == "## Section 2\nContent of section 2."
+
+
+def test_load_okf_index_filters_invalid_edges(tmp_path):
+    user_id = uuid.uuid4()
+    topic_id = uuid.uuid4()
+    okf_dir = str(tmp_path / "okf")
+    concepts_dir = Path(okf_dir) / "concepts"
+    cluster_dir = concepts_dir / "cluster_test"
+    cluster_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write a concept that relates to a non-existent concept
+    filepath = cluster_dir / "test-slug.md"
+    content = """---
+type: Concept
+title: Test Title
+description: Test Description
+tags: []
+related: ["non-existent-slug"]
+confidence: 1.0
+flagged: false
+flagged_reason:
+depth_level: 1
+created_at: 2026-06-29T00:00:00Z
+updated_at: 2026-06-29T00:00:00Z
+---
+# Test Title
+
+Test body.
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    graph = load_okf_index(user_id, topic_id, okf_dir)
+    assert len(graph["nodes"]) == 1
+    assert len(graph["edges"]) == 0
+
+
+from unittest.mock import patch
+
+@patch("app.services.okf_service._generate_json_with_llm")
+def test_expand_okf_concept_resolves_titles_to_slugs(mock_generate, tmp_path):
+    user_id = uuid.uuid4()
+    topic_id = uuid.uuid4()
+    okf_dir = str(tmp_path / "okf")
+    concepts_dir = Path(okf_dir) / "concepts"
+    cluster_dir = concepts_dir / "cluster_parent"
+    cluster_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write parent concept
+    filepath = cluster_dir / "parent-slug.md"
+    content = """---
+type: Concept
+title: Parent Title
+description: Parent Description
+tags: []
+related: []
+confidence: 1.0
+flagged: false
+flagged_reason:
+depth_level: 1
+created_at: 2026-06-29T00:00:00Z
+updated_at: 2026-06-29T00:00:00Z
+---
+# Parent Title
+
+Parent body.
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    # Mock the LLM output to spawn a new concept referencing parent by title
+    mock_generate.return_value = {
+        "updated_body": "Updated parent body.",
+        "new_concepts": [
+            {
+                "slug": "child-slug",
+                "title": "Child Title",
+                "description": "Child Description",
+                "body": "## Section\nChild body.",
+                "tags": ["child"],
+                "related": ["Parent Title"],
+                "depth_level": 2,
+            }
+        ],
+    }
+
+    from app.services.okf_service import expand_okf_concept
+    expand_okf_concept(user_id, topic_id, okf_dir, "parent-slug", "some new data")
+
+    # Assert new concept file has slug instead of title in related list
+    child_file = cluster_dir / "child-slug.md"
+    assert child_file.exists()
+
+    with open(child_file, "r", encoding="utf-8") as f:
+        child_content = f.read()
+
+    assert "related: [\"parent-slug\"]" in child_content or 'related: ["parent-slug"]' in child_content
