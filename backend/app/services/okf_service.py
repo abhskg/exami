@@ -185,7 +185,25 @@ def generate_okf_concepts(title: str, syllabus: str, query_data: dict[str, str])
             "slug": "mock-concept",
             "title": "Mock Concept",
             "description": "A mock concept for testing.",
-            "body": "## Introduction\nThis is a mock concept.",
+            "body": (
+                "## Introduction\n"
+                "This is a detailed mock concept designed to simulate a larger content size for testing. "
+                "It covers the architectural principles, definitions, and provides illustrative details "
+                "to fulfill the requirement for comprehensive knowledge base entries.\n\n"
+                "## Core Components\n"
+                "The system is built on top of robust services, database layers, and front-end interface modules. "
+                "Each component is decoupled to ensure modularity, scalability, and ease of unit testing. "
+                "The web parsing pipeline uses LLM-guided extraction to structure raw documents into clean "
+                "Open Knowledge Format (OKF) Markdown bundles. Let's look at the internal details...\n\n"
+                "## Advanced Concepts\n"
+                "To verify the system's ability to handle large concept files, this body contains multiple paragraphs "
+                "spanning across level-2 headings and including various structural markers. This ensures RAG chunking "
+                "behaves correctly on long documents. We also add code snippets below.\n\n"
+                "```python\n"
+                "def verify_chunk_size(chunk):\n"
+                "    return len(chunk) > 1000\n"
+                "```"
+            ),
             "related": [],
             "tags": ["mock"],
             "depth_level": 1,
