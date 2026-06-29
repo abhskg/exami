@@ -18,17 +18,10 @@ from app.models.tag import Tag
 from app.models.topic import Topic
 
 
-def purge_documents(db):
-    print("Purging documents and content chunks...")
-    db.query(Document).delete()
-    db.query(ContentChunk).delete()
-    db.commit()
-
-    # Clear uploads directory on disk
-    uploads_dir = Path(settings.UPLOADS_DIR)
-    if uploads_dir.exists():
-        print(f"Clearing storage uploads directory: {uploads_dir}")
-        for path in uploads_dir.iterdir():
+def _clear_dir(directory: Path, description: str):
+    if directory.exists():
+        print(f"Clearing {description}: {directory}")
+        for path in directory.iterdir():
             try:
                 if path.is_file():
                     path.unlink()
@@ -36,6 +29,17 @@ def purge_documents(db):
                     shutil.rmtree(path)
             except Exception as e:
                 print(f"Failed to delete {path}: {e}")
+
+
+def purge_documents(db):
+    print("Purging documents and content chunks...")
+    db.query(Document).delete()
+    db.query(ContentChunk).delete()
+    db.commit()
+
+    _clear_dir(Path(settings.UPLOADS_DIR), "storage uploads directory")
+    _clear_dir(Path(settings.DATA_DIR) / "staging", "staging directory")
+    _clear_dir(Path(settings.DATA_DIR) / "knowledge", "knowledge directory")
     print("Documents and content chunks purged successfully.")
 
 
@@ -62,17 +66,9 @@ def purge_topics(db):
     db.commit()
 
     # Also clean up disk files since documents are deleted
-    uploads_dir = Path(settings.UPLOADS_DIR)
-    if uploads_dir.exists():
-        print(f"Clearing storage uploads directory: {uploads_dir}")
-        for path in uploads_dir.iterdir():
-            try:
-                if path.is_file():
-                    path.unlink()
-                elif path.is_dir():
-                    shutil.rmtree(path)
-            except Exception as e:
-                print(f"Failed to delete {path}: {e}")
+    _clear_dir(Path(settings.UPLOADS_DIR), "storage uploads directory")
+    _clear_dir(Path(settings.DATA_DIR) / "staging", "staging directory")
+    _clear_dir(Path(settings.DATA_DIR) / "knowledge", "knowledge directory")
     print("Topics and all cascaded data purged successfully.")
 
 
