@@ -165,7 +165,7 @@ def search_ddg_and_scrape(query: str) -> str:
                     if cleaned_text:
                         # Limit to first 4000 characters to keep context sizes reasonable
                         page_contents.append(
-                            f"### Source Web Page: {target_url}\n\n{cleaned_text[:4000]}"
+                            f"### Source Web Page: {target_url}\n\n{cleaned_text[:30000]}"
                         )
             except Exception as pe:
                 logger.warning(f"Failed to scrape page '{target_url}': {pe}")

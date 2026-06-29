@@ -174,7 +174,7 @@ def generate_okf_concepts(title: str, syllabus: str, query_data: dict[str, str])
 
     sources_text = ""
     for query, text in query_data.items():
-        sources_text += f"\n--- Query Topic: {query} ---\n{text[:5000]}\n"
+        sources_text += f"\n--- Query Topic: {query} ---\n{text[:30000]}\n"
 
     prompt = CONCEPT_EXTRACTION_PROMPT.format(
         title=title, syllabus=syllabus, sources_text=sources_text
@@ -442,7 +442,13 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
             except Exception as e:
                 logger.error(f"Failed to parse OKF frontmatter for {file}: {e}")
 
-    return {"nodes": nodes, "edges": edges}
+    node_ids = {n["id"] for n in nodes}
+    valid_edges = [
+        edge
+        for edge in edges
+        if edge["source"] in node_ids and edge["target"] in node_ids
+    ]
+    return {"nodes": nodes, "edges": valid_edges}
 
 
 def expand_okf_concept(
@@ -503,6 +509,18 @@ You must return ONLY a JSON object with two keys:
     updated_body = result.get("updated_body", "")
     new_concepts = result.get("new_concepts", [])
 
+    # Extract parent title for title-to-slug resolution
+    title_match = re.search(r"title:\s*(.*)", frontmatter_text)
+    parent_title = title_match.group(1).strip() if title_match else slug
+
+    # Build lookup map for title -> slug resolution
+    title_to_slug = {parent_title.lower().strip(): slug}
+    for nc in new_concepts:
+        nc_title = nc.get("title")
+        nc_slug = nc.get("slug")
+        if nc_title and nc_slug:
+            title_to_slug[nc_title.lower().strip()] = nc_slug
+
     # Update related array in parent frontmatter if new concepts were created
     new_slugs = [c["slug"] for c in new_concepts]
 
@@ -529,7 +547,22 @@ You must return ONLY a JSON object with two keys:
         n_title = nc.get("title", n_slug)
         n_desc = nc.get("description", "")
         n_tags = json.dumps(nc.get("tags", []))
-        n_related = json.dumps(nc.get("related", [slug]))
+
+        # Resolve related titles to slugs
+        raw_related = nc.get("related", [])
+        resolved_related = []
+        if isinstance(raw_related, list):
+            for r in raw_related:
+                if isinstance(r, str):
+                    r_clean = r.strip()
+                    r_lower = r_clean.lower()
+                    if r_lower in title_to_slug:
+                        resolved_related.append(title_to_slug[r_lower])
+                    else:
+                        resolved_related.append(r_clean)
+        if not resolved_related:
+            resolved_related = [slug]
+        n_related = json.dumps(resolved_related)
         n_depth = nc.get("depth_level", 2)
         n_body = nc.get("body", "")
 
