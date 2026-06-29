@@ -243,7 +243,7 @@ def test_web_search_ingestion(client, db):
     assert doc_in_db is not None
     assert doc_in_db.status == "pending"
     assert doc_in_db.source_type == "web_scan"
-    assert not os.path.exists(doc_in_db.storage_path)
+    assert os.path.exists(doc_in_db.storage_path)
 
     # Run the worker synchronously using the web search parser agent task
     process_web_search_task(
@@ -257,15 +257,46 @@ def test_web_search_ingestion(client, db):
     )
 
     db.expire_all()
+    job_in_db = db.query(Job).filter(Job.id == job_id).first()
+    assert job_in_db.status == "awaiting_review"
+    assert doc_in_db.status == "parsing"
+
+    # Verify staging JSON exists
+    staging_path = os.path.join(settings.DATA_DIR, "staging", f"{job_id}.json")
+    assert os.path.exists(staging_path)
+
+    import json
+    with open(staging_path, "r", encoding="utf-8") as f:
+        approved_concepts = json.load(f)
+    assert len(approved_concepts) > 0
+
+    # Run the finalization worker synchronously
+    from app.workers.ingestion import finalize_web_search_task
+    finalize_web_search_task(
+        job_id,
+        document_id,
+        doc_in_db.user_id,
+        approved_concepts,
+        db=db,
+    )
+
+    db.expire_all()
     assert doc_in_db.status == "parsed"
-    assert os.path.exists(doc_in_db.storage_path)
+    assert job_in_db.status == "completed"
+    assert doc_in_db.okf_directory_path is not None
+    assert os.path.exists(doc_in_db.okf_directory_path)
 
-    # Verify synthesized file content
-    with open(doc_in_db.storage_path, "r", encoding="utf-8") as f:
-        file_text = f.read()
-        assert len(file_text) > 100
-        assert "QuickSort" in file_text
+    # Verify log and index files
+    assert os.path.exists(os.path.join(doc_in_db.okf_directory_path, "index.md"))
+    assert os.path.exists(os.path.join(doc_in_db.okf_directory_path, "log.md"))
 
-    # Cleanup file
+    # Cleanup staging file (should be deleted by finalization task)
+    assert not os.path.exists(staging_path)
+
+    # Cleanup OKF directory and storage path parameters file
+    import shutil
+    if os.path.exists(doc_in_db.okf_directory_path):
+        shutil.rmtree(doc_in_db.okf_directory_path)
     if os.path.exists(doc_in_db.storage_path):
         os.remove(doc_in_db.storage_path)
+

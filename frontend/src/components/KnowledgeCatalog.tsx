@@ -14,6 +14,7 @@ import {
   Save,
   Sparkles,
   Share2,
+  RefreshCw,
 } from 'lucide-react';
 
 import { KnowledgeGraph } from './knowledge/KnowledgeGraph';
@@ -118,6 +119,7 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
 
   // --- Chunks state ---
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [reparsingDocId, setReparsingDocId] = useState<string | null>(null);
   const [chunks, setChunks] = useState<ContentChunk[]>([]);
   const [isLoadingChunks, setIsLoadingChunks] = useState(false);
   const [chunkSearch, setChunkSearch] = useState('');
@@ -291,6 +293,29 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
       showToast('Network error renaming document', 'error');
     } finally {
       setIsSavingDoc(false);
+    }
+  };
+
+  // Reparse failed document
+  const handleReparseDoc = async (docId: string) => {
+    setReparsingDocId(docId);
+    try {
+      const res = await fetch(`${apiUrl}/api/documents/${docId}/reparse`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        showToast('Reparse started — processing in background', 'success');
+        fetchLocalDocuments();
+        onDocumentsChange();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.detail || 'Failed to start reparse', 'error');
+      }
+    } catch {
+      showToast('Network error starting reparse', 'error');
+    } finally {
+      setReparsingDocId(null);
     }
   };
 
@@ -819,6 +844,30 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                             </>
                           ) : (
                             <>
+                              {/* Reparse button — only shown for failed docs */}
+                              {doc.status === 'failed' && (
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    handleReparseDoc(doc.id);
+                                  }}
+                                  disabled={reparsingDocId === doc.id}
+                                  title="Retry ingestion"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: reparsingDocId === doc.id ? 'not-allowed' : 'pointer',
+                                    color: '#f59e0b',
+                                    opacity: reparsingDocId === doc.id ? 0.5 : 1,
+                                  }}
+                                >
+                                  {reparsingDocId === doc.id ? (
+                                    <Loader2 size={15} className="animate-spin" />
+                                  ) : (
+                                    <RefreshCw size={15} />
+                                  )}
+                                </button>
+                              )}
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
@@ -868,13 +917,18 @@ export const KnowledgeCatalog: React.FC<KnowledgeCatalogProps> = ({
                         </span>
                         <span>
                           Status:{' '}
-                          <strong
+                        <span
                             style={{
-                              color: doc.status === 'parsed' ? 'var(--accent-teal)' : '#f59e0b',
+                              color:
+                                doc.status === 'parsed'
+                                  ? 'var(--accent-teal)'
+                                  : doc.status === 'failed'
+                                  ? '#ef4444'
+                                  : '#f59e0b',
                             }}
                           >
                             {doc.status}
-                          </strong>
+                          </span>
                         </span>
                       </div>
                     </div>

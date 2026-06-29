@@ -330,6 +330,18 @@ async def ingest_web_search(
     db.refresh(doc_record)
     db.refresh(job_record)
 
+    # Write search parameters as JSON to storage_path so that it can be reparsed in case of failure.
+    import json
+    try:
+        with open(storage_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "title": req.title,
+                "syllabus": req.syllabus,
+                "topics": req.topics,
+            }, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to write web search parameters to {storage_path}: {e}")
+
     logger.info(
         f"Web search agent document entry created. Document ID: {document_id}. Registered background Job ID: {job_record.id}"
     )
@@ -408,6 +420,105 @@ def delete_document(
     db.commit()
     logger.info(f"User {current_user.email} deleted document {document_id} and all related chunks.")
     return {"message": "Document deleted successfully."}
+
+
+@router.post("/{document_id}/reparse", status_code=status.HTTP_202_ACCEPTED)
+def reparse_document(
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retry ingestion for a failed document.
+    - Clears all existing content chunks.
+    - Resets document status to 'pending'.
+    - Creates a fresh Job record.
+    - Re-launches the background ingestion worker.
+    For web_scan documents that failed after web search (staging JSON exists),
+    only the finalize step is re-run. Otherwise the full pipeline is restarted.
+    """
+    doc = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+
+    if doc.status not in ("failed",):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Document is not in a failed state (current status: '{doc.status}'). Only failed documents can be reparsed.",
+        )
+
+    # Delete any stale content chunks from the previous attempt
+    db.query(ContentChunk).filter(ContentChunk.document_id == document_id).delete()
+
+    # Reset document status
+    doc.status = "pending"
+    db.commit()
+
+    # Create a fresh job
+    job_record = Job(
+        user_id=current_user.id,
+        status="pending",
+        task_type="document_ingestion",
+        progress=0,
+    )
+    db.add(job_record)
+    db.commit()
+    db.refresh(job_record)
+
+    logger.info(
+        f"User {current_user.email} triggered reparse for document {document_id}. New Job ID: {job_record.id}"
+    )
+
+    # Always restart the correct ingestion pipeline based on source_type.
+    if doc.source_type == "web_scan":
+        import json
+        if not doc.storage_path or not os.path.exists(doc.storage_path):
+            # Rollback transaction changes if we abort
+            doc.status = "failed"
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Metadata for web search was not found. Please create a new web search instead.",
+            )
+        try:
+            with open(doc.storage_path, "r", encoding="utf-8") as f:
+                params = json.load(f)
+            title = params["title"]
+            syllabus = params["syllabus"]
+            topics = params["topics"]
+        except Exception as e:
+            logger.error(f"Failed to read web search metadata from {doc.storage_path}: {e}")
+            doc.status = "failed"
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to parse web search metadata. Please create a new web search instead.",
+            )
+
+        background_tasks.add_task(
+            process_web_search_task,
+            job_record.id,
+            doc.id,
+            current_user.id,
+            title,
+            syllabus,
+            topics,
+        )
+    else:
+        background_tasks.add_task(process_document_task, job_record.id, doc.id, current_user.id)
+
+    return {
+        "message": "Reparse started successfully.",
+        "document_id": str(document_id),
+        "job_id": str(job_record.id),
+    }
+
+
 
 
 @router.get("/{document_id}/chunks", response_model=list[ContentChunkResponse])

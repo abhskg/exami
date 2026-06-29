@@ -343,9 +343,14 @@ def finalize_web_search_task(
         job.message = "Chunking semantic concepts..."
         db.commit()
 
-        # Gather saved file paths
+        # Gather saved file paths by globbing the clustered directory structure.
+        # write_okf_concepts() writes to concepts/cluster_<hub>/<slug>.md,
+        # NOT the flat concepts/<slug>.md path, so we discover files on disk.
+        from pathlib import Path as _Path
+        concepts_dir = _Path(okf_dir) / "concepts"
         concept_files = [
-            os.path.join(okf_dir, "concepts", f"{c['slug']}.md") for c in approved_concepts
+            str(p) for p in concepts_dir.rglob("*.md")
+            if p.name != "index.md"
         ]
         chunks_data = chunk_from_okf(concept_files)
 

@@ -48,12 +48,15 @@ def test_write_and_load_okf_concepts(tmp_path):
     # Test Write
     write_okf_concepts(user_id, topic_id, concepts, okf_dir)
 
-    # Assert directories and files exist
+    # Assert directories and index files exist
     assert os.path.exists(okf_dir)
     assert os.path.exists(os.path.join(okf_dir, "index.md"))
     assert os.path.exists(os.path.join(okf_dir, "log.md"))
-    assert os.path.exists(os.path.join(okf_dir, "concepts", "arrays.md"))
-    assert os.path.exists(os.path.join(okf_dir, "concepts", "linked-lists.md"))
+    
+    # Assert concept files exist under clustered subdirectories
+    concepts_path = Path(okf_dir) / "concepts"
+    assert len(list(concepts_path.rglob("arrays.md"))) == 1
+    assert len(list(concepts_path.rglob("linked-lists.md"))) == 1
 
     # Test Load
     graph = load_okf_index(user_id, topic_id, okf_dir)

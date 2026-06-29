@@ -53,9 +53,12 @@ def get_concept_body(
     if not doc or not doc.okf_directory_path:
         raise HTTPException(status_code=404, detail="Knowledge directory not found")
 
-    filepath = os.path.join(doc.okf_directory_path, "concepts", f"{slug}.md")
-    if not os.path.exists(filepath):
+    from pathlib import Path as _Path
+    base_dir = _Path(doc.okf_directory_path) / "concepts"
+    matches = list(base_dir.rglob(f"{slug}.md"))
+    if not matches:
         raise HTTPException(status_code=404, detail="Concept file not found")
+    filepath = matches[0]
 
     with open(filepath, "r", encoding="utf-8") as f:
         return {"body": f.read()}
