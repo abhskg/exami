@@ -121,9 +121,8 @@ def _generate_json_with_llm(
                 logger.error(f"Failed to generate JSON from LLM: {e}")
                 raise e
 
-def _generate_text_with_llm(
-    prompt: str, is_mock: bool = False, mock_response: str = None
-) -> str:
+
+def _generate_text_with_llm(prompt: str, is_mock: bool = False, mock_response: str = None) -> str:
     """Helper to generate raw text (markdown) from LLM."""
     if is_mock:
         return mock_response or "Mock markdown content."
@@ -244,9 +243,42 @@ def validate_okf_concepts(concepts: list[dict]) -> list[dict]:
     return validated_concepts
 
 
+def _cluster_concepts(concepts: list[dict]) -> dict[str, list[dict]]:
+    """Groups concepts into connected components."""
+    adj = {c["slug"]: set() for c in concepts}
+    for c in concepts:
+        slug = c["slug"]
+        for target in c.get("related", []):
+            if target in adj:
+                adj[slug].add(target)
+                adj[target].add(slug)
+
+    visited = set()
+    clusters = {}
+    for c in concepts:
+        slug = c["slug"]
+        if slug not in visited:
+            cluster_nodes = []
+            queue = [slug]
+            visited.add(slug)
+            while queue:
+                curr = queue.pop(0)
+                cluster_nodes.append(curr)
+                for neighbor in adj[curr]:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append(neighbor)
+
+            cluster_concepts = [x for x in concepts if x["slug"] in cluster_nodes]
+            hub = max(cluster_nodes, key=lambda n: len(adj[n]))
+            clusters[f"cluster_{hub}"] = cluster_concepts
+
+    return clusters
+
+
 def write_okf_concepts(user_id: uuid.UUID, topic_id: uuid.UUID, concepts: list[dict], okf_dir: str):
     """
-    Write approved concept .md files + index.md + initial log.md entry.
+    Write approved concept .md files into clustered directories + index.md + initial log.md entry.
     """
     base_dir = Path(okf_dir)
     concepts_dir = base_dir / "concepts"
@@ -254,20 +286,30 @@ def write_okf_concepts(user_id: uuid.UUID, topic_id: uuid.UUID, concepts: list[d
 
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-    # Write individual concept files
-    for concept in concepts:
-        slug = concept["slug"]
-        title = concept.get("title", slug)
-        desc = concept.get("description", "")
-        tags = json.dumps(concept.get("tags", []))
-        related = json.dumps(concept.get("related", []))
-        confidence = concept.get("confidence", 1.0)
-        flagged = str(concept.get("flagged", False)).lower()
-        reason = concept.get("flagged_reason", "")
-        depth = concept.get("depth_level", 1)
-        body = concept.get("body", "")
+    clusters = _cluster_concepts(concepts)
+    master_index_content = f"# OKF Concept Index\n\nGenerated on {timestamp}\n\n## Clusters\n"
 
-        frontmatter = f"""---
+    for cluster_name, cluster_concepts in clusters.items():
+        cluster_dir = concepts_dir / cluster_name
+        cluster_dir.mkdir(parents=True, exist_ok=True)
+
+        cluster_index_content = (
+            f"# Cluster: {cluster_name}\n\nGenerated on {timestamp}\n\n## Concepts\n"
+        )
+
+        for concept in cluster_concepts:
+            slug = concept["slug"]
+            title = concept.get("title", slug)
+            desc = concept.get("description", "")
+            tags = json.dumps(concept.get("tags", []))
+            related = json.dumps(concept.get("related", []))
+            confidence = concept.get("confidence", 1.0)
+            flagged = str(concept.get("flagged", False)).lower()
+            reason = concept.get("flagged_reason", "")
+            depth = concept.get("depth_level", 1)
+            body = concept.get("body", "")
+
+            frontmatter = f"""---
 type: Concept
 title: {title}
 description: {desc}
@@ -284,21 +326,21 @@ updated_at: {timestamp}
 
 {body}
 """
-        filepath = concepts_dir / f"{slug}.md"
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(frontmatter)
+            filepath = cluster_dir / f"{slug}.md"
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(frontmatter)
 
-    # Write/update index.md
+            cluster_index_content += f"- [{title}]({slug}.md): {desc}\n"
+
+        with open(cluster_dir / "index.md", "w", encoding="utf-8") as f:
+            f.write(cluster_index_content)
+
+        master_index_content += f"- [{cluster_name}](concepts/{cluster_name}/index.md): {len(cluster_concepts)} concepts\n"
+
+    # Write master index.md
     index_path = base_dir / "index.md"
-    index_content = f"# OKF Concept Index\n\nGenerated on {timestamp}\n\n## Concepts\n"
-    for concept in concepts:
-        slug = concept["slug"]
-        title = concept.get("title", slug)
-        desc = concept.get("description", "")
-        index_content += f"- [{title}](concepts/{slug}.md): {desc}\n"
-
     with open(index_path, "w", encoding="utf-8") as f:
-        f.write(index_content)
+        f.write(master_index_content)
 
     # Write/append log.md
     append_okf_log(user_id, topic_id, "Generated initial OKF concepts from web search.", okf_dir)
@@ -342,7 +384,7 @@ def chunk_from_okf(concept_files: list[str]) -> list[tuple[str, str]]:
 
 def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dict:
     """
-    Parse index.md + all concept frontmatter -> graph JSON.
+    Parse all concept frontmatter recursively in clusters -> graph JSON.
     """
     base_dir = Path(okf_dir)
     concepts_dir = base_dir / "concepts"
@@ -351,7 +393,9 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
     edges = []
 
     if concepts_dir.exists():
-        for file in concepts_dir.glob("*.md"):
+        for file in concepts_dir.rglob("*.md"):
+            if file.name == "index.md":
+                continue
             try:
                 slug = file.stem
                 with open(file, "r", encoding="utf-8") as f:
@@ -361,7 +405,7 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
                 if len(parts) >= 3:
                     frontmatter_text = parts[1]
 
-                    # Manual basic parsing since we don't have pyyaml
+                    # Manual basic parsing
                     title_match = re.search(r"title:\s*(.*)", frontmatter_text)
                     desc_match = re.search(r"description:\s*(.*)", frontmatter_text)
                     related_match = re.search(
@@ -382,13 +426,14 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
                     except:
                         tags = []
 
+                    cluster_name = file.parent.name
                     nodes.append(
                         {
                             "id": slug,
                             "title": title,
                             "description": desc,
                             "tags": tags,
-                            "path": f"concepts/{file.name}",
+                            "path": f"concepts/{cluster_name}/{file.name}",
                         }
                     )
 
@@ -400,29 +445,41 @@ def load_okf_index(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str) -> dic
     return {"nodes": nodes, "edges": edges}
 
 
-def expand_okf_concept(user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str, slug: str, new_raw_data: str) -> str:
+def expand_okf_concept(
+    user_id: uuid.UUID, topic_id: uuid.UUID, okf_dir: str, slug: str, new_raw_data: str
+) -> tuple[str, list[str]]:
     """
-    Merge or append to an existing concept file (deep-dive) using an LLM to rewrite the body seamlessly.
+    Merge or append to an existing concept file using an LLM to rewrite the body seamlessly,
+    and potentially spawn new concepts. Returns (updated_body, list_of_all_modified_slugs).
     """
     is_mock = settings.APP_ENV == "test"
-    filepath = Path(okf_dir) / "concepts" / f"{slug}.md"
-    
-    if not filepath.exists():
-        raise ValueError(f"Concept {slug} not found.")
+    base_dir = Path(okf_dir)
+
+    # Find the concept file in any cluster directory
+    matches = list(base_dir.glob(f"concepts/*/{slug}.md"))
+    if not matches:
+        # Fallback for older flat structure
+        matches = list(base_dir.glob(f"concepts/{slug}.md"))
+        if not matches:
+            raise ValueError(f"Concept {slug} not found in any cluster.")
+    filepath = matches[0]
+    cluster_dir = filepath.parent
+    # If the parent is literally "concepts", it's an unclustered legacy doc.
+    cluster_name = cluster_dir.name if cluster_dir.name != "concepts" else None
 
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Split frontmatter
     parts = content.split("---")
     if len(parts) >= 3:
-        frontmatter = "---" + parts[1] + "---"
+        frontmatter_text = parts[1]
         body = "---".join(parts[2:]).strip()
     else:
-        frontmatter = ""
+        frontmatter_text = ""
         body = content.strip()
 
-    prompt = f"""You are an expert knowledge engineer. Your task is to update and expand an existing educational concept markdown document with new information.
+    prompt = f"""You are an expert knowledge engineer. Your task is to update and expand an existing educational concept document with new information.
+If the new information introduces entirely new dense concepts, spawn them as new concepts.
 
 Existing Concept Body:
 {body}
@@ -430,29 +487,86 @@ Existing Concept Body:
 New Information to Weave In:
 {new_raw_data}
 
-Instructions:
-1. Seamlessly integrate the new information into the existing body.
-2. Expand upon the concepts, add new sections if necessary using Markdown (##).
-3. Do NOT output any YAML frontmatter or title headers (# Title).
-4. Output ONLY the updated markdown body. Ensure high educational quality.
+Output format:
+You must return ONLY a JSON object with two keys:
+- "updated_body": The newly rewritten markdown body for this concept (do not include title headers or YAML).
+- "new_concepts": A list of objects for any new concepts spawned (each containing "slug", "title", "description", "body", "tags", "related", "depth_level"). Leave empty if no new concepts are needed.
 """
 
-    updated_body = _generate_text_with_llm(prompt, is_mock=is_mock, mock_response=body + f"\n\n## Added Information\n{new_raw_data}")
+    mock_resp = {
+        "updated_body": body + f"\n\n## Added Information\n{new_raw_data}",
+        "new_concepts": [],
+    }
 
-    # Remove codeblock wrappers if the model wrapped it in markdown tags
-    if updated_body.startswith("```markdown"):
-        updated_body = updated_body.removeprefix("```markdown").removesuffix("```").strip()
-    elif updated_body.startswith("```"):
-        updated_body = updated_body.removeprefix("```").removesuffix("```").strip()
+    result = _generate_json_with_llm(prompt, is_mock=is_mock, mock_response=mock_resp)
 
-    # Overwrite file
+    updated_body = result.get("updated_body", "")
+    new_concepts = result.get("new_concepts", [])
+
+    # Update related array in parent frontmatter if new concepts were created
+    new_slugs = [c["slug"] for c in new_concepts]
+
+    related_match = re.search(r"related:\s*(\[.*?\])", frontmatter_text, flags=re.DOTALL)
+    if related_match:
+        try:
+            related_list = json.loads(related_match.group(1))
+            related_list.extend(new_slugs)
+            related_list = list(set(related_list))
+            frontmatter_text = frontmatter_text.replace(
+                related_match.group(0), f"related: {json.dumps(related_list)}"
+            )
+        except:
+            pass
+
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Overwrite the parent file
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(frontmatter + "\n" + updated_body + "\n")
+        f.write(f"---\n{frontmatter_text}\n---\n# {filepath.stem}\n\n{updated_body}\n")
 
-    # Log the update
-    append_okf_log(user_id, topic_id, f"Manually deepened concept: {slug}", okf_dir)
+    # Generate new concept files in the same cluster
+    for nc in new_concepts:
+        n_slug = nc["slug"]
+        n_title = nc.get("title", n_slug)
+        n_desc = nc.get("description", "")
+        n_tags = json.dumps(nc.get("tags", []))
+        n_related = json.dumps(nc.get("related", [slug]))
+        n_depth = nc.get("depth_level", 2)
+        n_body = nc.get("body", "")
 
-    return updated_body
+        n_frontmatter = f"""---
+type: Concept
+title: {n_title}
+description: {n_desc}
+tags: {n_tags}
+related: {n_related}
+confidence: 1.0
+flagged: false
+flagged_reason: 
+depth_level: {n_depth}
+created_at: {timestamp}
+updated_at: {timestamp}
+---
+# {n_title}
+
+{n_body}
+"""
+        with open(cluster_dir / f"{n_slug}.md", "w", encoding="utf-8") as f:
+            f.write(n_frontmatter)
+
+        # Append to cluster index (or base index if legacy flat structure)
+        index_file = cluster_dir / "index.md" if cluster_name is not None else base_dir / "index.md"
+        with open(index_file, "a", encoding="utf-8") as f:
+            f.write(f"- [{n_title}]({n_slug}.md): {n_desc}\n")
+
+    append_okf_log(
+        user_id,
+        topic_id,
+        f"Manually deepened concept: {slug}. Spawned {len(new_concepts)} new concepts.",
+        okf_dir,
+    )
+
+    all_modified_slugs = [slug] + new_slugs
+    return updated_body, all_modified_slugs
 
 
 def append_okf_log(user_id: uuid.UUID, topic_id: uuid.UUID, event: str, okf_dir: str):

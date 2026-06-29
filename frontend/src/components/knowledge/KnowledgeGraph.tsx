@@ -31,31 +31,32 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchGraph = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${apiUrl}/api/knowledge/${topicId}/graph`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          if (res.status === 404) {
-            setError('No knowledge graph found. Run a web search ingestion first.');
-          } else {
-            setError('Failed to fetch knowledge graph');
-          }
-          return;
+  const fetchGraph = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/knowledge/${topicId}/graph`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError('No knowledge graph found. Run a web search ingestion first.');
+        } else {
+          setError('Failed to fetch knowledge graph');
         }
-        const data = await res.json();
-        setNodes(data.nodes);
-        setLinks(data.edges);
-      } catch (err) {
-        setError('Network error loading knowledge graph');
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
+      const data = await res.json();
+      setNodes(data.nodes);
+      setLinks(data.edges);
+    } catch (err) {
+      setError('Network error loading knowledge graph');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchGraph();
   }, [apiUrl, token, topicId]);
 
@@ -103,9 +104,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
     // Create a main group for zoom
     const g = svg.append('g').attr('class', 'main-group');
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
+      .on('zoom', event => {
         g.attr('transform', event.transform);
       });
 
@@ -140,12 +142,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
       )
       .on('click', (event, d) => setSelectedNode(d));
 
-    node.append('circle')
-        .attr('r', 18)
-        .attr('fill', 'var(--accent-primary)')
-        .attr('stroke', 'var(--accent-secondary)')
-        .attr('stroke-width', 2)
-        .style('filter', 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))');
+    node
+      .append('circle')
+      .attr('r', 18)
+      .attr('fill', 'var(--accent-primary)')
+      .attr('stroke', 'var(--accent-secondary)')
+      .attr('stroke-width', 2)
+      .style('filter', 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))');
 
     node
       .append('text')
@@ -193,11 +196,49 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
 
     // Add explicit zoom controls
     d3.select(containerRef.current).select('.zoom-controls').remove();
-    const controls = d3.select(containerRef.current).append('div').attr('class', 'zoom-controls').style('position', 'absolute').style('bottom', '20px').style('right', '20px').style('display', 'flex').style('gap', '8px');
-    
-    controls.append('button').text('+').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.scaleBy, 1.3));
-    controls.append('button').text('-').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.scaleBy, 0.7));
-    controls.append('button').text('⟲').style('width', '32px').style('height', '32px').style('border-radius', '50%').style('background', 'var(--bg-tertiary)').style('border', '1px solid var(--border-color)').style('color', 'var(--text-primary)').style('cursor', 'pointer').on('click', () => svg.transition().call(zoom.transform, d3.zoomIdentity));
+    const controls = d3
+      .select(containerRef.current)
+      .append('div')
+      .attr('class', 'zoom-controls')
+      .style('position', 'absolute')
+      .style('bottom', '20px')
+      .style('right', '20px')
+      .style('display', 'flex')
+      .style('gap', '8px');
+
+    controls
+      .append('button')
+      .text('+')
+      .style('width', '32px')
+      .style('height', '32px')
+      .style('border-radius', '50%')
+      .style('background', 'var(--bg-tertiary)')
+      .style('border', '1px solid var(--border-color)')
+      .style('color', 'var(--text-primary)')
+      .style('cursor', 'pointer')
+      .on('click', () => svg.transition().call(zoom.scaleBy, 1.3));
+    controls
+      .append('button')
+      .text('-')
+      .style('width', '32px')
+      .style('height', '32px')
+      .style('border-radius', '50%')
+      .style('background', 'var(--bg-tertiary)')
+      .style('border', '1px solid var(--border-color)')
+      .style('color', 'var(--text-primary)')
+      .style('cursor', 'pointer')
+      .on('click', () => svg.transition().call(zoom.scaleBy, 0.7));
+    controls
+      .append('button')
+      .text('⟲')
+      .style('width', '32px')
+      .style('height', '32px')
+      .style('border-radius', '50%')
+      .style('background', 'var(--bg-tertiary)')
+      .style('border', '1px solid var(--border-color)')
+      .style('color', 'var(--text-primary)')
+      .style('cursor', 'pointer')
+      .on('click', () => svg.transition().call(zoom.transform, d3.zoomIdentity));
 
     return () => {
       simulation.stop();
@@ -205,7 +246,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
   }, [nodes, links]);
 
   if (isLoading) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading knowledge graph...</div>;
+    return (
+      <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        Loading knowledge graph...
+      </div>
+    );
   }
 
   if (error) {
@@ -213,16 +258,57 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
   }
 
   return (
-    <div className="glass-card" style={{ display: 'flex', height: '600px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'var(--bg-primary)' }}>
+    <div
+      className="glass-card"
+      style={{
+        display: 'flex',
+        height: '600px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-primary)',
+      }}
+    >
       <div style={{ flex: 1, position: 'relative' }} ref={containerRef}>
-        <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: 'grab', display: 'block' }} />
-        <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(19, 27, 46, 0.8)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backdropFilter: 'blur(8px)' }}>
-          <h3 style={{ fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: '4px' }}>Knowledge Graph</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>Scroll or pinch to zoom. Drag nodes to explore. Click to read.</p>
+        <svg
+          ref={svgRef}
+          style={{ width: '100%', height: '100%', cursor: 'grab', display: 'block' }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '16px',
+            background: 'rgba(19, 27, 46, 0.8)',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <h3
+            style={{
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              margin: 0,
+              marginBottom: '4px',
+            }}
+          >
+            Knowledge Graph
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>
+            Scroll or pinch to zoom. Drag nodes to explore. Click to read.
+          </p>
         </div>
       </div>
       {selectedNode && (
-        <div style={{ width: '400px', borderLeft: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+        <div
+          style={{
+            width: '400px',
+            borderLeft: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+          }}
+        >
           <ConceptDetailPanel
             apiUrl={apiUrl}
             token={token}
@@ -230,6 +316,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ apiUrl, token, t
             conceptSlug={selectedNode.id}
             conceptTitle={selectedNode.title}
             onClose={() => setSelectedNode(null)}
+            onConceptDeepened={fetchGraph}
           />
         </div>
       )}

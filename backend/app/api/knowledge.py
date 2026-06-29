@@ -4,8 +4,8 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.api.auth_dependencies import get_current_user
+from app.core.database import get_db
 from app.models.document import Document
 from app.models.user import User
 from app.schemas.knowledge import ConceptReviewRequest, DeepenRequest, KnowledgeGraph
@@ -115,23 +115,24 @@ def deepen_concept(
         raise HTTPException(status_code=404, detail="Knowledge directory not found")
 
     try:
-        updated_content = expand_okf_concept(
+        updated_content, all_modified_slugs = expand_okf_concept(
             current_user.id, topic_id, doc.okf_directory_path, slug, request.new_raw_data
         )
 
         from app.workers.ingestion import update_concept_embeddings_task
+
         background_tasks.add_task(
             update_concept_embeddings_task,
             doc.id,
             topic_id,
             current_user.id,
             doc.okf_directory_path,
-            slug,
+            all_modified_slugs,
         )
 
         return {
             "status": "success",
-            "message": "Concept expanded",
+            "message": f"Concept expanded and {len(all_modified_slugs) - 1} new concepts spawned.",
             "updated_content": updated_content,
         }
     except ValueError as e:

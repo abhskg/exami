@@ -410,35 +410,50 @@ def update_concept_embeddings_task(
     topic_id: uuid.UUID,
     user_id: uuid.UUID,
     okf_dir: str,
-    slug: str,
+    slugs: list[str],
     db: SessionLocal = None,
 ):
     """
-    Background worker task to re-vectorize a single OKF concept after it has been expanded or modified.
-    Drops old chunks for this specific concept file and generates new ones.
+    Background worker task to re-vectorize multiple OKF concepts after they have been expanded or modified.
+    Drops old chunks for these specific concept files and generates new ones.
     """
     is_external_db = db is not None
     if not is_external_db:
         db = SessionLocal()
 
     try:
+        from pathlib import Path
+
         from app.services.okf_service import chunk_from_okf
 
-        okf_concept_path = f"concepts/{slug}.md"
-        
-        # Drop existing chunks for this file
+        base_dir = Path(okf_dir)
+        concept_file_paths = []
+        okf_concept_paths = []
+
+        for slug in slugs:
+            matches = list(base_dir.glob(f"concepts/*/{slug}.md"))
+            if not matches:
+                matches = list(base_dir.glob(f"concepts/{slug}.md"))
+            if matches:
+                concept_file_paths.append(str(matches[0]))
+                cluster_name = matches[0].parent.name
+                if cluster_name == "concepts":
+                    okf_concept_paths.append(f"concepts/{slug}.md")
+                else:
+                    okf_concept_paths.append(f"concepts/{cluster_name}/{slug}.md")
+
+        # Drop existing chunks for these files
         db.query(ContentChunk).filter(
             ContentChunk.document_id == document_id,
-            ContentChunk.okf_concept_path == okf_concept_path
-        ).delete()
+            ContentChunk.okf_concept_path.in_(okf_concept_paths),
+        ).delete(synchronize_session=False)
         db.commit()
 
-        # Re-chunk the modified file
-        concept_file_path = os.path.join(okf_dir, "concepts", f"{slug}.md")
-        chunks_data = chunk_from_okf([concept_file_path])
+        # Re-chunk the modified files
+        chunks_data = chunk_from_okf(concept_file_paths)
 
         if not chunks_data:
-            logger.warning(f"No text chunks found for expanded concept {slug}")
+            logger.warning(f"No text chunks found for expanded concepts {slugs}")
             return
 
         texts = [text for _, text in chunks_data]
@@ -446,8 +461,9 @@ def update_concept_embeddings_task(
 
         # Insert new chunks
         new_chunks = []
-        for i, (path, text) in enumerate(chunks_data):
-            # path is the absolute path, we store relative "concepts/slug.md"
+        for i, (path_str, text) in enumerate(chunks_data):
+            # path is the absolute path, we need relative "concepts/cluster/slug.md"
+            rel_path = Path(path_str).relative_to(base_dir).as_posix()
             new_chunks.append(
                 ContentChunk(
                     document_id=document_id,
@@ -456,17 +472,17 @@ def update_concept_embeddings_task(
                     chunk_text=text,
                     embedding=embeddings[i] if embeddings else None,
                     chunk_index=i,
-                    okf_concept_path=okf_concept_path,
+                    okf_concept_path=rel_path,
                 )
             )
 
         db.bulk_save_objects(new_chunks)
         db.commit()
-        logger.info(f"Successfully re-embedded {len(new_chunks)} chunks for {slug}")
+        logger.info(f"Successfully re-embedded {len(new_chunks)} chunks for {slugs}")
 
     except Exception as e:
         db.rollback()
-        logger.exception(f"Failed to update embeddings for concept {slug}: {e}")
+        logger.exception(f"Failed to update embeddings for concepts {slugs}: {e}")
     finally:
         if not is_external_db:
             db.close()
