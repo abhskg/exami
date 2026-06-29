@@ -34,7 +34,7 @@ You must return ONLY a JSON array of objects, where each object has the followin
 - "slug": a unique URL-friendly string identifier (e.g., "arrays", "hash-maps")
 - "title": a human-readable title (e.g., "Arrays")
 - "description": a one-line summary of the concept
-- "body": the full explanation in Markdown format. Use Markdown headings (##) for sections. Do NOT include the main title (#) inside the body, start directly with ## sections or paragraphs.
+- "body": the full, highly detailed explanation in Markdown format. The body must be extremely comprehensive, extensive, and complete (ideally 1500 to 3000 words, covering all subtopics, detailed examples, step-by-step guides, code blocks or code examples where relevant, mathematical formulations, and thorough explanations). Use multiple level-2 Markdown headings (##) and level-3 headings (###) for structure. Do NOT write a brief summary or a few short paragraphs. Do not summarize, truncate, or omit details; avoid placeholders. Start directly with ## sections or paragraphs.
 - "related": a list of string slugs for related concepts extracted in this batch
 - "tags": a list of relevant tags (e.g., ["data-structures", "memory"])
 - "depth_level": integer indicating depth (1=surface, 2=intermediate, 3=deep)
@@ -49,7 +49,7 @@ Concepts to review:
 {concepts_json}
 
 Rules for flagging:
-- If a concept has very little detail, flag it.
+- If a concept has very little detail (e.g., less than 500 words or 3000 characters in body length), flag it as too brief or incomplete.
 - If a concept seems contradictory or factually suspicious, flag it.
 - If a concept lacks proper structure, flag it.
 
