@@ -306,3 +306,27 @@ class TestManagementAPI:
 
         deleted_t2 = db.query(Tag).filter(Tag.id == t2.id).first()
         assert deleted_t2 is None
+
+
+def test_document_delete_handles_physical_file_exception(client, auth_headers, test_topic, db):
+    # Create document with an invalid storage path (a directory) to force exception during deletion
+    doc = Document(
+        user_id=test_topic.user_id,
+        topic_id=test_topic.id,
+        source_type="manual_topic_text",
+        original_filename="un-deletable-file.txt",
+        storage_path=".",  # a directory, exists but cannot be deleted via os.remove
+        status="parsed",
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    resp_delete = client.delete(f"/api/documents/{doc.id}", headers=auth_headers)
+    assert resp_delete.status_code == 200
+    assert resp_delete.json()["message"] == "Document deleted successfully."
+
+    # Verify document is still deleted from database
+    deleted_doc = db.query(Document).filter(Document.id == doc.id).first()
+    assert deleted_doc is None
+

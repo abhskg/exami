@@ -8,6 +8,7 @@ from app.models.content_chunk import ContentChunk
 from app.models.document import Document
 from app.models.job import Job
 from app.models.topic import Topic
+from app.models.user import User
 from app.workers.ingestion import process_document_task, process_web_search_task
 
 
@@ -315,5 +316,253 @@ def test_web_search_ingest_request_relaxed_limits():
     )
     assert req.syllabus == large_syllabus
     assert req.topics == large_topics
+
+
+def test_update_topic_endpoint(client, db):
+    headers = get_auth_headers(client)
+    import uuid
+
+    # Create two topics
+    res1 = client.post("/api/topics/", json={"name": "Topic A", "description": "Desc A"}, headers=headers)
+    res2 = client.post("/api/topics/", json={"name": "Topic B", "description": "Desc B"}, headers=headers)
+    topic_a_id = res1.json()["id"]
+    topic_b_id = res2.json()["id"]
+
+    # Rename Topic A to Topic C (should succeed)
+    res_update = client.put(f"/api/topics/{topic_a_id}", json={"name": "Topic C", "description": "New Desc A"}, headers=headers)
+    assert res_update.status_code == 200
+    assert res_update.json()["name"] == "Topic C"
+    assert res_update.json()["description"] == "New Desc A"
+
+    # Rename Topic B to Topic C (should fail due to conflict name)
+    res_conflict = client.put(f"/api/topics/{topic_b_id}", json={"name": "Topic C"}, headers=headers)
+    assert res_conflict.status_code == 400
+    assert "already exists" in res_conflict.json()["detail"]
+
+    # Update topic that doesn't exist
+    res_not_found = client.put(f"/api/topics/{uuid.uuid4()}", json={"name": "Topic X"}, headers=headers)
+    assert res_not_found.status_code == 404
+
+
+def test_delete_topic_endpoint(client, db):
+    headers = get_auth_headers(client)
+    import uuid
+
+    # Create topic
+    res = client.post("/api/topics/", json={"name": "Topic to Delete", "description": "Will be deleted"}, headers=headers)
+    topic_id = res.json()["id"]
+
+    # Delete topic
+    res_del = client.delete(f"/api/topics/{topic_id}", headers=headers)
+    assert res_del.status_code == 204
+
+    # Verify it is deleted in database
+    res_get = client.get("/api/topics/", headers=headers)
+    topic_ids = [t["id"] for t in res_get.json()]
+    assert topic_id not in topic_ids
+
+    # Delete topic that doesn't exist (should 404)
+    res_del_not_found = client.delete(f"/api/topics/{uuid.uuid4()}", headers=headers)
+    assert res_del_not_found.status_code == 404
+
+
+def test_reparse_document_endpoint_validations(client, db):
+    headers = get_auth_headers(client)
+    import uuid
+
+    # Create a topic
+    res_topic = client.post("/api/topics/", json={"name": "Reparse Topic", "description": "Reparse validations"}, headers=headers)
+    topic_id = res_topic.json()["id"]
+
+    # 1. Reject reparsing non-existent document
+    res_not_found = client.post(f"/api/documents/{uuid.uuid4()}/reparse", headers=headers)
+    assert res_not_found.status_code == 404
+
+    # 2. Seed a parsed document and verify reparse is rejected (409 Conflict)
+    doc = Document(
+        user_id=db.query(User).filter(User.email == "ingestiontest@example.com").first().id,
+        topic_id=uuid.UUID(topic_id),
+        source_type="upload_text",
+        original_filename="parsed.txt",
+        status="parsed",
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    res_conflict = client.post(f"/api/documents/{doc.id}/reparse", headers=headers)
+    assert res_conflict.status_code == 409
+    assert "is not in a failed state" in res_conflict.json()["detail"]
+
+
+def test_reparse_successful_normal_document(client, db):
+    headers = get_auth_headers(client)
+    user = db.query(User).filter(User.email == "ingestiontest@example.com").first()
+    import uuid
+
+    # Create topic
+    res_topic = client.post("/api/topics/", json={"name": "Reparse Topic Success", "description": "Normal doc reparse"}, headers=headers)
+    topic_id = res_topic.json()["id"]
+
+    # Seed a failed upload document and some chunks
+    doc = Document(
+        user_id=user.id,
+        topic_id=uuid.UUID(topic_id),
+        source_type="upload_text",
+        original_filename="failed_doc.txt",
+        storage_path="./data/uploads/failed_doc.txt",
+        status="failed",
+    )
+    db.add(doc)
+    db.flush()
+
+    chunk = ContentChunk(
+        document_id=doc.id,
+        user_id=user.id,
+        topic_id=uuid.UUID(topic_id),
+        chunk_text="Stale chunk text",
+        chunk_index=0,
+    )
+    db.add(chunk)
+    db.commit()
+
+    # Create the file on disk so the ingestion worker doesn't fail immediately
+    os.makedirs(os.path.dirname(doc.storage_path), exist_ok=True)
+    with open(doc.storage_path, "w", encoding="utf-8") as f:
+        f.write("New parsed text after reparsing.")
+
+    # Call reparse endpoint
+    res_reparse = client.post(f"/api/documents/{doc.id}/reparse", headers=headers)
+    assert res_reparse.status_code == 202
+    data = res_reparse.json()
+    assert data["message"] == "Reparse started successfully."
+    
+    job_id = uuid.UUID(data["job_id"])
+
+    # Run the document ingestion task synchronously to process the reparse
+    process_document_task(job_id, doc.id, user.id, db=db)
+
+    # Verify chunks updated and document status is parsed
+    db.expire_all()
+    db.refresh(doc)
+    assert doc.status == "parsed"
+
+    chunks = db.query(ContentChunk).filter(ContentChunk.document_id == doc.id).all()
+    assert len(chunks) == 1
+    assert chunks[0].chunk_text == "New parsed text after reparsing."
+
+    # Cleanup file
+    if os.path.exists(doc.storage_path):
+        os.remove(doc.storage_path)
+
+
+def test_reparse_web_scan_failures(client, db):
+    headers = get_auth_headers(client)
+    user = db.query(User).filter(User.email == "ingestiontest@example.com").first()
+    import uuid
+
+    # Create topic
+    res_topic = client.post("/api/topics/", json={"name": "Reparse Web Scan", "description": "Web scan fail"}, headers=headers)
+    topic_id = res_topic.json()["id"]
+
+    # 1. Seed a failed web_scan document with NO metadata storage file
+    doc = Document(
+        user_id=user.id,
+        topic_id=uuid.UUID(topic_id),
+        source_type="web_scan",
+        original_filename="web_scan_failed",
+        storage_path="./data/uploads/missing_metadata.json",
+        status="failed",
+    )
+    db.add(doc)
+    db.commit()
+
+    res_missing_meta = client.post(f"/api/documents/{doc.id}/reparse", headers=headers)
+    assert res_missing_meta.status_code == 400
+    assert "Metadata for web search was not found" in res_missing_meta.json()["detail"]
+
+    # 2. Seed invalid metadata file on disk
+    doc.storage_path = "./data/uploads/corrupt_metadata.json"
+    db.commit()
+    with open(doc.storage_path, "w", encoding="utf-8") as f:
+        f.write("{invalid json}")
+
+    res_corrupt_meta = client.post(f"/api/documents/{doc.id}/reparse", headers=headers)
+    assert res_corrupt_meta.status_code == 400
+    assert "Failed to parse web search metadata" in res_corrupt_meta.json()["detail"]
+
+    # Cleanup
+    if os.path.exists(doc.storage_path):
+        os.remove(doc.storage_path)
+
+
+def test_update_concept_embeddings_task(db, client):
+    headers = get_auth_headers(client)
+    user = db.query(User).filter(User.email == "ingestiontest@example.com").first()
+    from app.workers.ingestion import update_concept_embeddings_task
+    import uuid
+    from pathlib import Path
+    import shutil
+
+    # Setup mock directories and create a valid topic
+    res_topic = client.post("/api/topics/", json={"name": "Embed Task Topic", "description": "Desc"}, headers=headers)
+    topic_id = uuid.UUID(res_topic.json()["id"])
+    okf_dir = f"./data/knowledge/{user.id}/{topic_id}"
+    concepts_dir = Path(okf_dir) / "concepts"
+    concepts_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(concepts_dir / "stack.md", "w", encoding="utf-8") as f:
+        f.write("---\ntitle: Stack\ndescription: LIFO structure\n---\n# Stack\nBody contents.")
+
+    doc = Document(
+        user_id=user.id,
+        topic_id=topic_id,
+        source_type="web_scan",
+        original_filename="embed_task_doc",
+        status="parsed",
+        okf_directory_path=okf_dir,
+    )
+    db.add(doc)
+    db.flush()
+
+    # Insert initial chunk
+    chunk = ContentChunk(
+        document_id=doc.id,
+        user_id=user.id,
+        topic_id=topic_id,
+        chunk_text="Old chunk stack",
+        okf_concept_path="concepts/stack.md",
+        chunk_index=0,
+    )
+    db.add(chunk)
+    db.commit()
+
+    # Trigger background update task
+    update_concept_embeddings_task(doc.id, topic_id, user.id, okf_dir, ["stack"], db=db)
+
+    # Verify chunk is updated/re-vectorized
+    db.expire_all()
+    chunks = db.query(ContentChunk).filter(ContentChunk.document_id == doc.id).all()
+    assert len(chunks) == 1
+    assert chunks[0].chunk_text == "# Stack\nBody contents."
+
+    # Cleanup
+    if os.path.exists(okf_dir):
+        shutil.rmtree(okf_dir)
+
+
+def test_finalize_web_search_exception_rollback(db, client):
+    # Try running finalization with an invalid document ID to trigger exception
+    from app.workers.ingestion import finalize_web_search_task
+    import uuid
+    invalid_doc_id = uuid.uuid4()
+    invalid_job_id = uuid.uuid4()
+
+    # Task should handle exception and not crash the worker thread
+    finalize_web_search_task(invalid_job_id, invalid_doc_id, uuid.uuid4(), [], db=db)
+    # Execution succeeds without throwing unhandled database exception
+
+
+
 
 

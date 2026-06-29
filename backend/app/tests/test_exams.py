@@ -425,3 +425,58 @@ class TestExamEngineAPI:
         assert tag_perf["linked lists"]["incorrect_count"] == 1
         assert tag_perf["linked lists"]["skipped_count"] == 1
         assert tag_perf["linked lists"]["percentage"] == 0.0
+
+
+def test_get_session_auto_concludes_when_expired(client, auth_headers, test_topic, seeded_questions, db):
+    # Create a timed session
+    resp = client.post(
+        "/api/exams/sessions",
+        json={
+            "topic_id": str(test_topic.id),
+            "mode": "timed",
+            "question_count": 2,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    session_id = resp.json()["id"]
+
+    # Force start time to be in the past (expired)
+    db_session = db.query(ExamSession).filter(ExamSession.id == uuid.UUID(session_id)).first()
+    db_session.started_at = datetime.now(timezone.utc) - timedelta(seconds=db_session.time_limit_seconds + 10)
+    db.commit()
+
+    # Call GET session (should auto-conclude session)
+    res_get = client.get(f"/api/exams/sessions/{session_id}", headers=auth_headers)
+    assert res_get.status_code == 200
+    assert res_get.json()["status"] == "completed"
+
+
+def test_get_results_blocks_active_timed_session(client, auth_headers, test_topic, seeded_questions, db):
+    # Create a timed session
+    resp = client.post(
+        "/api/exams/sessions",
+        json={
+            "topic_id": str(test_topic.id),
+            "mode": "timed",
+            "question_count": 1,
+        },
+        headers=auth_headers,
+    )
+    session_id = resp.json()["id"]
+
+    # Attempt to fetch results (should fail with 400 since timed limit is not exceeded)
+    res_res = client.get(f"/api/exams/sessions/{session_id}/results", headers=auth_headers)
+    assert res_res.status_code == 400
+    assert "Cannot retrieve results for an active timed session" in res_res.json()["detail"]
+
+    # Force start time to be in the past to trigger auto-conclude on results fetch
+    db_session = db.query(ExamSession).filter(ExamSession.id == uuid.UUID(session_id)).first()
+    db_session.started_at = datetime.now(timezone.utc) - timedelta(seconds=db_session.time_limit_seconds + 10)
+    db.commit()
+
+    # Attempt to fetch results (should succeed and auto-conclude)
+    res_res_expired = client.get(f"/api/exams/sessions/{session_id}/results", headers=auth_headers)
+    assert res_res_expired.status_code == 200
+    assert res_res_expired.json()["status"] == "completed"
+
